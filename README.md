@@ -276,7 +276,7 @@ Individual inclusion proofs are generated and independently verifiable.
 | Expected Value optimization | ✅ Implemented | `EV(a) = P × amount − cost` |
 | Thompson Sampling (Beta-Bernoulli) | ✅ Implemented | Context-segmented Beta posteriors per failure code |
 | Leak-free ML Cross-Validation | ✅ GroupKFold | Grouped by payment_id (Train ∩ Test = ∅) |
-| Python Offline Test Suite | ✅ 108 passing | 0 failures, 100% offline isolated (176s) |
+| Python Offline Test Suite | ✅ 110 passing | 0 failures, 100% offline isolated (153s) |
 | Go Microservices Test Suite | ✅ 112 passing | recovery-executor, worker, events (100% PASS) |
 | Full API Endpoint Suite | ✅ 16 passing | RFC 6962 Merkle, SHAP, MAB, DLQ, rate limiting |
 | SHAP model explanations | ✅ Implemented | `shap.TreeExplainer` on real RF model |
@@ -300,7 +300,7 @@ Individual inclusion proofs are generated and independently verifiable.
 
 | Layer / Subsystem | Test Command | Scope / Coverage | Verified Result | Execution Time |
 | :--- | :--- | :--- | :--- | :--- |
-| **Python Unit Suite** | `python -m pytest -m "not integration"` | 47 test files (idempotency, decision policies, economic routing, bandits) | **108 / 108 PASS (100%)** | 176.92s |
+| **Python Unit Suite** | `python -m pytest -m "not integration"` | 47 test files (idempotency, decision policies, economic routing, bandits) | **110 / 110 PASS (100%)** | 153.02s |
 | **Full API Endpoints** | `python -m pytest backend/api/test_full_endpoints.py` | 16 full integration routes (RFC 6962 Merkle trees, SHAP, MAB, DLQ, rate limiting) | **16 / 16 PASS (100%)** | 130.72s |
 | **Go Microservice** | `cd backend/go-executor && go test -count=1 ./...` | Circuit breaker, token bucket, backpressure streaming, event deduplication | **112 / 112 PASS (100%)** | 15.67s |
 | **Frontend UI Build** | `cd frontend && npm run build` | React 18, TypeScript strict mode, Tailwind CSS, Vite packaging | **BUILD SUCCESS (0 errors)** | 3.05s |
@@ -320,6 +320,9 @@ Individual inclusion proofs are generated and independently verifiable.
 - **[Phase 2: Live Integration & Verification Report](docs/phase2-integration-report.md)** — Docker orchestration, shared in-memory resilience, full endpoint execution, and ML stability analysis.
 - **[Phase 2: Payment Simulator & Decision Engine Audit](docs/phase2-simulator-audit.md)** — In-depth evaluation of synthetic data generation, Common Random Numbers (CRN) counterfactual evaluation, baseline fairness, and in-domain oracle effects.
 - **[Phase 3: Contextual Decisioning, Fair Baselines, & Safe Exploration](docs/phase3-contextual-decisioning-report.md)** — 4-way benchmarking with Expert-Tuned rule baselines, 9.0% selectivity gating trade-offs, and Contextual Thompson Sampling formulation.
+- **[Phase 4: Experiment Methodology Audit](docs/phase4-experiment-methodology-audit.md)** — Full lifecycle tracing across 4 strategies, CRN isolation verification, and policy gating evaluation.
+- **[Phase 4: Economic & Operational Evaluation](docs/phase4-economic-evaluation.md)** — Multi-margin sensitivity analysis (100% gross down to 0.5% MDR), break-even dynamics, and unmodeled failure penalties.
+- **[Phase 4: Multi-Seed Statistical Significance](docs/phase4-multiseed-results.md)** — 5-seed evaluation ($N=50,000$), standard errors, 95% confidence intervals, and paired Student's t-tests.
 
 ### Primary Portfolio & Architecture Reports
 
@@ -597,7 +600,7 @@ cd frontend && npm install && npm run dev
 ## Testing & ML Auditing
 
 ```bash
-# 1. Python unit tests (108 passing, zero network dependencies, 100% offline)
+# 1. Python unit tests (110 passing, zero network dependencies, 100% offline)
 python -m pytest -m "not integration"
 
 # 2. Full API Endpoints suite (16 passing, RFC 6962, SHAP, MAB, DLQ, rate limiting)
