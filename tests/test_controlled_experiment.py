@@ -69,3 +69,66 @@ def test_different_actions_have_independent_outcomes():
     # payment + action counterfactual worlds.
     assert isinstance(retry_now, bool)
     assert isinstance(retry_later, bool)
+
+
+def test_controlled_experiment_net_economics_and_margin():
+    result = run_controlled_experiment(
+        customer_count=50,
+        payment_count=200,
+        seed=42,
+        margin=0.02,  # 2% MDR merchant fee
+    )
+
+    for strategy in ["baseline", "rule_based", "ai"]:
+        assert "intervention_cost" in result[strategy]
+        assert "net_recovered_revenue" in result[strategy]
+        assert "net_revenue_per_failure" in result[strategy]
+        # Net revenue = gross * margin - cost
+        expected_net = (
+            result[strategy]["recovered_revenue"] * 0.02
+            - result[strategy]["intervention_cost"]
+        )
+        assert abs(result[strategy]["net_recovered_revenue"] - expected_net) < 1e-4
+
+    assert "net_revenue_difference" in result
+    assert "net_revenue_improvement" in result
+
+
+def test_controlled_experiment_zero_margin_edge_case():
+    result = run_controlled_experiment(
+        customer_count=50,
+        payment_count=200,
+        seed=42,
+        margin=0.0,
+    )
+    # With 0 margin, net recovered revenue must be <= 0 (negative costs incurred)
+    for strategy in ["baseline", "rule_based", "ai"]:
+        assert result[strategy]["net_recovered_revenue"] <= 0.0
+        assert result[strategy]["intervention_cost"] >= 0.0
+
+
+def test_recovery_probability_bounds_clamped():
+    from simulator.models import Customer, Payment
+    from simulator.recovery import recovery_probablity
+    from datetime import datetime
+
+    low_customer = Customer(
+        id="c-low",
+        successful_payments=0,
+        failed_payments=100,
+        recovered_payments=0,
+    )
+    # CARD_EXPIRED with RETRY_NOW gives 0.10 + 0 - 0.15 = -0.05 without clamping
+    payment = Payment(
+        id="p-edge",
+        customer_id="c-low",
+        amount=100.0,
+        payment_method="CARD",
+        bank="SBI",
+        failure_code="CARD_EXPIRED",
+        timestamp=datetime(2026, 1, 1),
+        status="FAILED",
+    )
+    prob = recovery_probablity(low_customer, payment, "RETRY_NOW")
+    assert 0.0 <= prob <= 1.0
+    assert prob >= 0.0

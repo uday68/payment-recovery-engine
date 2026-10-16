@@ -6,7 +6,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from simulator.generator import generate_payments,generate_customers
 from simulator.recovery import recovery_probablity
 from ml.model_store import load_model
-from backend.decision.engine import choose_action
+from backend.decision.engine import choose_action, ACTION_COSTS
 from backend.experiment import build_context,predict_actions
 
 from backend.policy.engine import apply_policy
@@ -35,11 +35,14 @@ def evaluate_strategy(payment, customer, action):
         probability,
     )
 
+    cost = ACTION_COSTS.get(action, 0.0)
+
     return {
         "action": action,
         "probability": probability,
         "recovered": recovered,
         "recovered_revenue": payment.amount if recovered else 0.0,
+        "cost": cost,
     }
 def recovery_outcome(payment_id,action, probability):
     """
@@ -56,7 +59,8 @@ def run_controlled_experiment(
         payment_count =10000,
         seed=42,
         model=None,
-        return_audit_events=False
+        return_audit_events=False,
+        margin: float = 1.0,
 ):
     random.seed(seed)
     customers = generate_customers(customer_count)
@@ -75,12 +79,15 @@ def run_controlled_experiment(
         model = load_model()
     baseline_recoveries = 0
     baseline_revenue = 0.0
+    baseline_cost = 0.0
 
     rule_recoveries = 0
     rule_revenue = 0.0
+    rule_cost = 0.0
 
     ai_recoveries =0
     ai_revenue =0.0
+    ai_cost = 0.0
     ai_action =0
     audit_events =[]
 
@@ -120,7 +127,7 @@ def run_controlled_experiment(
 
         baseline_probablity =  recovery_probablity(customer,payment,"RETRY_NOW")
         baseline_success = recovery_outcome(payment.id,"RETRY_NOW",baseline_probablity)
-
+        baseline_cost += ACTION_COSTS.get("RETRY_NOW", 2.0)
 
         if baseline_success:
             baseline_recoveries+=1
@@ -135,6 +142,7 @@ def run_controlled_experiment(
             customer,
             rule_action,
         )
+        rule_cost += rule_result["cost"]
 
         if rule_result["recovered"]:
             rule_recoveries += 1
@@ -153,6 +161,7 @@ def run_controlled_experiment(
         decision = choose_action(
             payment.amount,
             probabilities,
+            margin=margin,
         )
 
         selected_action = decision["action"]
@@ -191,6 +200,7 @@ def run_controlled_experiment(
             policy_blocked += 1
 
         action_counts[approved_action] += 1
+        ai_cost += ACTION_COSTS.get(approved_action, 0.0)
 
         ai_probability = recovery_probablity(
             customer,
@@ -233,19 +243,34 @@ def run_controlled_experiment(
         else 0.0
     )
 
+    # Net economics accounting for intervention costs and merchant margin
+    baseline_net_revenue = (baseline_revenue * margin) - baseline_cost
+    rule_net_revenue = (rule_revenue * margin) - rule_cost
+    ai_net_revenue = (ai_revenue * margin) - ai_cost
+
+    baseline_net_per_failure = (baseline_net_revenue / failed_count if failed_count else 0.0)
+    rule_net_per_failure = (rule_net_revenue / failed_count if failed_count else 0.0)
+    ai_net_per_failure = (ai_net_revenue / failed_count if failed_count else 0.0)
+
     revenue_difference = (ai_revenue - baseline_revenue)
-
     revenue_improvement = (revenue_difference / baseline_revenue * 100 if baseline_revenue else 0.0)
-
     recovery_improvement = ((ai_recovery_rate - baseline_recovery_rate)/ baseline_recovery_rate* 100
         if baseline_recovery_rate
         else 0.0)
+
+    net_revenue_difference = ai_net_revenue - baseline_net_revenue
+    net_revenue_improvement = (
+        (net_revenue_difference / abs(baseline_net_revenue) * 100)
+        if baseline_net_revenue != 0
+        else 0.0
+    )
     
     result = {
         "customers": customer_count,
         "payments": payment_count,
         "failed_payments": failed_count,
         "at_risk_revenue": at_risk_revenue,
+        "margin": margin,
 
         "baseline": {
             "failed_payments": failed_count,
@@ -253,6 +278,9 @@ def run_controlled_experiment(
             "recovery_rate": baseline_recovery_rate,
             "recovered_revenue": baseline_revenue,
             "revenue_per_failure": baseline_revenue_per_failure,
+            "intervention_cost": baseline_cost,
+            "net_recovered_revenue": baseline_net_revenue,
+            "net_revenue_per_failure": baseline_net_per_failure,
         },
 
         "rule_based": {
@@ -261,6 +289,9 @@ def run_controlled_experiment(
             "recovery_rate": rule_recovery_rate,
             "recovered_revenue": rule_revenue,
             "revenue_per_failure": rule_revenue_per_failure,
+            "intervention_cost": rule_cost,
+            "net_recovered_revenue": rule_net_revenue,
+            "net_revenue_per_failure": rule_net_per_failure,
         },
 
         "ai": {
@@ -269,11 +300,16 @@ def run_controlled_experiment(
             "recovery_rate": ai_recovery_rate,
             "recovered_revenue": ai_revenue,
             "revenue_per_failure": ai_revenue_per_failure,
+            "intervention_cost": ai_cost,
+            "net_recovered_revenue": ai_net_revenue,
+            "net_revenue_per_failure": ai_net_per_failure,
         },
 
         "revenue_difference": revenue_difference,
         "revenue_improvement": revenue_improvement,
         "recovery_improvement": recovery_improvement,
+        "net_revenue_difference": net_revenue_difference,
+        "net_revenue_improvement": net_revenue_improvement,
 
         "action_counts": action_counts,
         "recommended_action_counts":recommended_action_counts,

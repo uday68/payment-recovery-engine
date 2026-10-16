@@ -25,7 +25,12 @@ CATEGORICAL_FEATURES = [
 ]
 
 
-def build_pipeline(model_type: str = "random_forest", calibrate: bool = False, calibrate_cv: int = 3):
+def build_pipeline(
+    model_type: str = "random_forest",
+    calibrate: bool = False,
+    calibrate_cv: int = 3,
+    calibration_method: str = "sigmoid",
+):
     preprocessor = ColumnTransformer(
         transformers=[
             (
@@ -58,7 +63,7 @@ def build_pipeline(model_type: str = "random_forest", calibrate: bool = False, c
 
     if calibrate and model_type != "dummy":
         cv = calibrate_cv if calibrate_cv is not None else 3
-        estimator = CalibratedClassifierCV(base_model, method="sigmoid", cv=cv)
+        estimator = CalibratedClassifierCV(base_model, method=calibration_method, cv=cv)
     else:
         estimator = base_model
 

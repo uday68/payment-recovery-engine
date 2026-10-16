@@ -86,9 +86,10 @@ def audit_models_cross_validation(
 
     results = {
         "Dummy (Prior)": [],
-        "Logistic Regression": [],
-        "Random Forest (Raw)": [],
-        "Random Forest (Calibrated)": [],
+        "Logistic Regression (L2)": [],
+        "Random Forest (Raw - Preferred)": [],
+        "Random Forest (Sigmoid Calibrated)": [],
+        "Random Forest (Isotonic Calibrated)": [],
     }
 
     for fold, (train_idx, val_idx) in enumerate(gkf.split(X, y, groups=groups), 1):
@@ -105,12 +106,19 @@ def audit_models_cross_validation(
 
         models = {
             "Dummy (Prior)": build_pipeline(model_type="dummy"),
-            "Logistic Regression": build_pipeline(model_type="logistic"),
-            "Random Forest (Raw)": build_pipeline(model_type="random_forest", calibrate=False),
-            "Random Forest (Calibrated)": build_pipeline(
+            "Logistic Regression (L2)": build_pipeline(model_type="logistic"),
+            "Random Forest (Raw - Preferred)": build_pipeline(model_type="random_forest", calibrate=False),
+            "Random Forest (Sigmoid Calibrated)": build_pipeline(
                 model_type="random_forest",
                 calibrate=(cal_cv >= 2),
                 calibrate_cv=max(2, cal_cv),
+                calibration_method="sigmoid",
+            ),
+            "Random Forest (Isotonic Calibrated)": build_pipeline(
+                model_type="random_forest",
+                calibrate=(cal_cv >= 2),
+                calibrate_cv=max(2, cal_cv),
+                calibration_method="isotonic",
             ),
         }
 

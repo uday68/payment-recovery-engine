@@ -51,7 +51,7 @@ def recovery_probablity(
     if action == "NO_ACTION":
         return 0.0
     
-    return probability
+    return max(0.0, min(1.0, probability))
 
 def execute_recovery(customer:Customer, payment:Payment, action:str)->bool:
     """
