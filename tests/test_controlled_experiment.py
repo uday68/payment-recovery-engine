@@ -131,4 +131,25 @@ def test_recovery_probability_bounds_clamped():
     )
     prob = recovery_probablity(low_customer, payment, "RETRY_NOW")
     assert 0.0 <= prob <= 1.0
-    assert prob >= 0.0
+    assert prob >= 0.0
+
+
+def test_controlled_experiment_evaluates_expert_rule_baseline():
+    result = run_controlled_experiment(
+        customer_count=50,
+        payment_count=200,
+        seed=42,
+    )
+    assert "expert_rule" in result
+    assert "vs_expert_rule" in result
+
+    expert = result["expert_rule"]
+    assert expert["failed_payments"] == result["failed_payments"]
+    assert expert["recoveries"] > 0
+    assert expert["recovery_rate"] > 0.0
+    assert expert["recovered_revenue"] > 0.0
+
+    # Expert rule must strictly outperform the naive rule baseline on BANK_TIMEOUT and LIMIT_EXCEEDED
+    naive = result["rule_based"]
+    assert expert["recovery_rate"] >= naive["recovery_rate"]
+    assert expert["recovered_revenue"] >= naive["recovered_revenue"]

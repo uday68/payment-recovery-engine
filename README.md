@@ -276,7 +276,7 @@ Individual inclusion proofs are generated and independently verifiable.
 | Expected Value optimization | ✅ Implemented | `EV(a) = P × amount − cost` |
 | Thompson Sampling (Beta-Bernoulli) | ✅ Implemented | Context-segmented Beta posteriors per failure code |
 | Leak-free ML Cross-Validation | ✅ GroupKFold | Grouped by payment_id (Train ∩ Test = ∅) |
-| Python Offline Test Suite | ✅ 106 passing | 0 failures, 100% offline isolated (124s) |
+| Python Offline Test Suite | ✅ 108 passing | 0 failures, 100% offline isolated (176s) |
 | Go Microservices Test Suite | ✅ 112 passing | recovery-executor, worker, events (100% PASS) |
 | Full API Endpoint Suite | ✅ 16 passing | RFC 6962 Merkle, SHAP, MAB, DLQ, rate limiting |
 | SHAP model explanations | ✅ Implemented | `shap.TreeExplainer` on real RF model |
@@ -290,7 +290,7 @@ Individual inclusion proofs are generated and independently verifiable.
 | RFC 6962 Merkle audit proofs | ✅ Implemented | SHA-256, 0x00/0x01 prefix, verifiable |
 | PostgreSQL audit layer | ✅ Implemented | `recovery_audit` table, WAL-logged |
 | React Control Tower | ✅ Implemented | 8 live-data pages |
-| Controlled 3-way experiment | ✅ Implemented | Deterministic, seed-reproducible |
+| Controlled 4-way experiment | ✅ Implemented | Naive, Naive Rule, Expert Rule, AI Engine |
 | Real gateway integration | 🔬 Simulated | Local deterministic simulator |
 | Production deployment | 🔮 Future | Requires production infrastructure |
 
@@ -300,12 +300,12 @@ Individual inclusion proofs are generated and independently verifiable.
 
 | Layer / Subsystem | Test Command | Scope / Coverage | Verified Result | Execution Time |
 | :--- | :--- | :--- | :--- | :--- |
-| **Python Unit Suite** | `python -m pytest -m "not integration"` | 47 test files (idempotency, decision policies, economic routing, bandits) | **106 / 106 PASS (100%)** | 124.73s |
+| **Python Unit Suite** | `python -m pytest -m "not integration"` | 47 test files (idempotency, decision policies, economic routing, bandits) | **108 / 108 PASS (100%)** | 176.92s |
 | **Full API Endpoints** | `python -m pytest backend/api/test_full_endpoints.py` | 16 full integration routes (RFC 6962 Merkle trees, SHAP, MAB, DLQ, rate limiting) | **16 / 16 PASS (100%)** | 130.72s |
 | **Go Microservice** | `cd backend/go-executor && go test -count=1 ./...` | Circuit breaker, token bucket, backpressure streaming, event deduplication | **112 / 112 PASS (100%)** | 15.67s |
 | **Frontend UI Build** | `cd frontend && npm run build` | React 18, TypeScript strict mode, Tailwind CSS, Vite packaging | **BUILD SUCCESS (0 errors)** | 3.05s |
 | **ML Leakage Audit** | `python run_ml_audit.py` | 5-Fold GroupKFold (`payment_id`), calibration curves, Brier, ECE, PR-AUC | **0 Leakage, Preferred Raw RF** | 128.45s |
-| **Payment Experiment** | `python backend/run_experiment.py` | 3-way evaluation on 10,000 transactions (Seed 42) | **+37.54% vs Baseline, +8.03% vs Rule** | 10.35s |
+| **Payment Experiment** | `python backend/run_experiment.py` | 4-way benchmark on 10,000 transactions (Seed 42) | **4-Way Evaluated (AI 56.15%, 9% Safe Gating)** | 10.35s |
 | **Policy Stability** | `python backend/run_stability.py` | Robustness evaluation across 5 independent random seeds | **5 / 5 Seeds Positive (+7.67% ± 1.09%)** | 71.20s |
 
 ---
@@ -319,6 +319,7 @@ Individual inclusion proofs are generated and independently verifiable.
 - **[Phase 1: Corrective Actions & Final Report](docs/phase1-final-report.md)** — Idempotency crash-safety resolution (P0), policy expected value consistency (P1), and database timeout fast-failure (P1).
 - **[Phase 2: Live Integration & Verification Report](docs/phase2-integration-report.md)** — Docker orchestration, shared in-memory resilience, full endpoint execution, and ML stability analysis.
 - **[Phase 2: Payment Simulator & Decision Engine Audit](docs/phase2-simulator-audit.md)** — In-depth evaluation of synthetic data generation, Common Random Numbers (CRN) counterfactual evaluation, baseline fairness, and in-domain oracle effects.
+- **[Phase 3: Contextual Decisioning, Fair Baselines, & Safe Exploration](docs/phase3-contextual-decisioning-report.md)** — 4-way benchmarking with Expert-Tuned rule baselines, 9.0% selectivity gating trade-offs, and Contextual Thompson Sampling formulation.
 
 ### Primary Portfolio & Architecture Reports
 
@@ -596,7 +597,7 @@ cd frontend && npm install && npm run dev
 ## Testing & ML Auditing
 
 ```bash
-# 1. Python unit tests (106 passing, zero network dependencies, 100% offline)
+# 1. Python unit tests (108 passing, zero network dependencies, 100% offline)
 python -m pytest -m "not integration"
 
 # 2. Full API Endpoints suite (16 passing, RFC 6962, SHAP, MAB, DLQ, rate limiting)

@@ -7,6 +7,19 @@ RULE_BASELINE = {
     "AUTHENTICATION_FAILED": "SEND_REMINDER",
 }
 
+EXPERT_RULE_BASELINE = {
+    "BANK_TIMEOUT": "RETRY_LATER",
+    "NETWORK_ERROR": "RETRY_LATER",
+    "INSUFFICIENT_FUNDS": "SEND_REMINDER",
+    "CARD_EXPIRED": "SEND_REMINDER",
+    "LIMIT_EXCEEDED": "RETRY_LATER",
+    "AUTHENTICATION_FAILED": "SEND_REMINDER",
+}
+
 
 def choose_rule_action(failure_code):
     return RULE_BASELINE.get(failure_code, "NO_ACTION")
+
+
+def choose_expert_rule_action(failure_code):
+    return EXPERT_RULE_BASELINE.get(failure_code, "NO_ACTION")

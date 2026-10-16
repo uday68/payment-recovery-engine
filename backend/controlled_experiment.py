@@ -10,7 +10,7 @@ from backend.decision.engine import choose_action, ACTION_COSTS
 from backend.experiment import build_context,predict_actions
 
 from backend.policy.engine import apply_policy
-from backend.rule_baseline import choose_rule_action
+from backend.rule_baseline import choose_rule_action, choose_expert_rule_action
 
 from backend.audit import create_audit_event
 
@@ -85,8 +85,12 @@ def run_controlled_experiment(
     rule_revenue = 0.0
     rule_cost = 0.0
 
-    ai_recoveries =0
-    ai_revenue =0.0
+    expert_recoveries = 0
+    expert_revenue = 0.0
+    expert_cost = 0.0
+
+    ai_recoveries = 0
+    ai_revenue = 0.0
     ai_cost = 0.0
     ai_action =0
     audit_events =[]
@@ -147,6 +151,21 @@ def run_controlled_experiment(
         if rule_result["recovered"]:
             rule_recoveries += 1
             rule_revenue += payment.amount
+
+        # -----------------------------------
+        # EXPERT RULE-BASED DECISION
+        # -----------------------------------
+        expert_action = choose_expert_rule_action(payment.failure_code)
+        expert_result = evaluate_strategy(
+            payment,
+            customer,
+            expert_action,
+        )
+        expert_cost += expert_result["cost"]
+
+        if expert_result["recovered"]:
+            expert_recoveries += 1
+            expert_revenue += payment.amount
 
         #-----------------------------------
         # AI DECISION
@@ -243,13 +262,26 @@ def run_controlled_experiment(
         else 0.0
     )
 
+    expert_recovery_rate = (
+        expert_recoveries / failed_count
+        if failed_count
+        else 0.0
+    )
+    expert_revenue_per_failure = (
+        expert_revenue / failed_count
+        if failed_count
+        else 0.0
+    )
+
     # Net economics accounting for intervention costs and merchant margin
     baseline_net_revenue = (baseline_revenue * margin) - baseline_cost
     rule_net_revenue = (rule_revenue * margin) - rule_cost
+    expert_net_revenue = (expert_revenue * margin) - expert_cost
     ai_net_revenue = (ai_revenue * margin) - ai_cost
 
     baseline_net_per_failure = (baseline_net_revenue / failed_count if failed_count else 0.0)
     rule_net_per_failure = (rule_net_revenue / failed_count if failed_count else 0.0)
+    expert_net_per_failure = (expert_net_revenue / failed_count if failed_count else 0.0)
     ai_net_per_failure = (ai_net_revenue / failed_count if failed_count else 0.0)
 
     revenue_difference = (ai_revenue - baseline_revenue)
@@ -294,6 +326,17 @@ def run_controlled_experiment(
             "net_revenue_per_failure": rule_net_per_failure,
         },
 
+        "expert_rule": {
+            "failed_payments": failed_count,
+            "recoveries": expert_recoveries,
+            "recovery_rate": expert_recovery_rate,
+            "recovered_revenue": expert_revenue,
+            "revenue_per_failure": expert_revenue_per_failure,
+            "intervention_cost": expert_cost,
+            "net_recovered_revenue": expert_net_revenue,
+            "net_revenue_per_failure": expert_net_per_failure,
+        },
+
         "ai": {
             "failed_payments": failed_count,
             "recoveries": ai_recoveries,
@@ -310,6 +353,12 @@ def run_controlled_experiment(
         "recovery_improvement": recovery_improvement,
         "net_revenue_difference": net_revenue_difference,
         "net_revenue_improvement": net_revenue_improvement,
+        "vs_expert_rule": {
+            "revenue_difference": ai_revenue - expert_revenue,
+            "revenue_improvement": ((ai_revenue - expert_revenue) / expert_revenue * 100) if expert_revenue else 0.0,
+            "recovery_improvement": ((ai_recovery_rate - expert_recovery_rate) / expert_recovery_rate * 100) if expert_recovery_rate else 0.0,
+            "net_revenue_difference": ai_net_revenue - expert_net_revenue,
+        },
 
         "action_counts": action_counts,
         "recommended_action_counts":recommended_action_counts,
