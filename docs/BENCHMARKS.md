@@ -123,8 +123,10 @@ python backend/run_experiment.py
 | **Failed Payments** | 2,978 | 2,978 | 2,978 | - | - |
 | **Recovered Count** | 1,173 | 1,529 | **1,616** | **+443 (+37.8%)** | **+87 (+5.7%)** |
 | **Recovery Rate** | 39.39% | 51.34% | **54.26%** | **+14.87 pp** | **+2.92 pp** |
-| **Recovered Revenue** | ₹6,031,208.04 | ₹7,743,805.85 | **₹8,255,913.70** | **+₹2,224,705.66 (+36.89%)** | **+₹512,107.85 (+6.61%)** |
-| **Revenue / Failure** | ₹2,025.25 | ₹2,600.34 | **₹2,772.30** | **+₹747.05** | **+₹171.96** |
+| **Gross Recovered Revenue** | ₹6,031,208.04 | ₹7,743,805.85 | **₹8,255,913.70** | **+₹2,224,705.66 (+36.89%)** | **+₹512,107.85 (+6.61%)** |
+| **Intervention Costs** | ₹5,956.00 | ₹4,297.00 | **₹4,013.00** | **-₹1,943.00 (-32.6%)** | **-₹284.00 (-6.6%)** |
+| **Net Recovered Revenue** | ₹6,025,252.04 | ₹7,739,508.85 | **₹8,251,900.70** | **+₹2,226,648.66 (+36.95%)** | **+₹512,391.85 (+6.62%)** |
+| **Net Revenue / Failure** | ₹2,023.25 | ₹2,598.89 | **₹2,770.95** | **+₹747.70** | **+₹172.06** |
 
 ---
 
@@ -150,14 +152,33 @@ Total Retries:      1,264
 ## 6. How to Reproduce All Benchmarks
 
 ```powershell
-# 1. Run full unit and integration tests (62 Python + 46 Go tests)
-python -m pytest -v
-cd backend/go-executor && go test -v ./... && cd ../..
+# 1. Run full leak-free unit tests (103 Python tests + 100% Go tests)
+python -m pytest -m "not integration"
+cd backend/go-executor && go test ./... && cd ../..
 
-# 2. Run single controlled 3-way experiment
+# 2. Run 5-Fold GroupKFold ML Model Benchmark
+python run_ml_audit.py
+
+# 3. Run single controlled 3-way experiment with net economics
 python backend/run_experiment.py
 
-# 3. Run multi-seed stability evaluation
+# 4. Run multi-seed stability evaluation
 python backend/run_stability.py
 ```
+
+---
+
+## 7. Machine Learning Model Benchmark (5-Fold GroupKFold)
+
+From `ml/evaluation_audit.json` (evaluated with zero group leakage across `payment_id`):
+
+| Model Architecture | ROC-AUC | PR-AUC | Brier Score Loss | Log Loss | ECE | Preferred Status |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Dummy (Prior Classifier)** | 0.5000 ± 0.0000 | 0.3310 ± 0.0048 | 0.2214 ± 0.0016 | 0.6349 ± 0.0033 | 0.0045 ± 0.0039 | Baseline |
+| **Logistic Regression (L2)** | 0.7697 ± 0.0029 | 0.5654 ± 0.0067 | 0.1749 ± 0.0007 | 0.4937 ± 0.0015 | 0.0080 ± 0.0023 | Linear Baseline |
+| **Random Forest (Raw)** | **0.7897 ± 0.0029** | **0.6036 ± 0.0071** | **0.1699 ± 0.0011** | **0.4836 ± 0.0025** | **0.0124 ± 0.0021** | **Production Preferred** |
+| **Random Forest (Sigmoid)** | 0.7913 ± 0.0033 | 0.6062 ± 0.0074 | 0.1826 ± 0.0012 | 0.5416 ± 0.0036 | 0.0975 ± 0.0029 | Degraded Calibration |
+| **Random Forest (Isotonic)** | 0.7884 ± 0.0028 | 0.6028 ± 0.0073 | 0.1706 ± 0.0011 | 0.4901 ± 0.0026 | 0.0163 ± 0.0024 | Sub-fold Overfitting |
+
+*For deep dive on the calibration discrepancy and causal simulator limitations, see [Portfolio Applied ML Report](PORTFOLIO_APPLIED_ML_SYSTEMS_REPORT.md).*
 

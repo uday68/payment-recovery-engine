@@ -101,39 +101,62 @@ Payment Context
 
 ### 3. Expected-Value Optimization
 
-For each action, the engine estimates the economic value of attempting recovery:
+For each candidate recovery action, the engine estimates the net economic recovery value, explicitly accounting for intervention costs and merchant recovery margins:
 
 $$
-EV(a) = P(Y=1 \mid X,a) \times \text{Amount} - \text{Cost}(a)
+EV(a) = \begin{cases} 
+0.0 & \text{if } a = \text{NO\_ACTION} \\ 
+P(Y=1 \mid X, a) \cdot (\text{Margin} \times \text{Amount}) - \text{Cost}(a) & \text{otherwise} 
+\end{cases}
 $$
 
-The selected action is:
+Where intervention costs reflect actual payment gateway and customer messaging tariffs:
+* `RETRY_NOW`: ₹2.00
+* `RETRY_LATER`: ₹2.00
+* `SEND_REMINDER`: ₹1.00
+* `NO_ACTION`: ₹0.00
+
+If all active actions yield negative expected value (e.g. high retry cost on micro-transactions with low recovery probabilities, or zero merchant margin), the system mathematically selects:
 
 $$
-a^* = \arg\max_{a \in A} EV(a)
+a^* = \arg\max_{a \in A} EV(a) = \text{NO\_ACTION}
 $$
 
-The selected action is then passed to Thompson Sampling and the deterministic
-policy gate. The policy gate has final authority and can replace the model's
-recommendation with `NO_ACTION`, `RETRY_LATER`, or another safe action.
+The selected action is then passed to Contextual Thompson Sampling and the deterministic policy gate. The policy gate has final authority and can replace the model's recommendation with `NO_ACTION` whenever confidence or margin conditions are violated.
 
 ---
 
 ## Verified Results
 
-Controlled experiment across **10,000 synthetic payments** (2,978 failures, seed 42):
+### 1. Leak-Free ML Benchmark (5-Fold GroupKFold Cross-Validation)
 
-| Strategy | Recovered | Rate | Revenue |
-|---|---:|---:|---:|
-| 🔴 Naive Always-Retry | 1,173 | 39.39% | ₹6.03M |
-| 🟡 Rule-Based Heuristic | 1,529 | 51.34% | ₹7.74M |
-| 🟢 **AI EV Engine** | **1,616** | **54.26%** | **₹8.26M** |
+Evaluated via `python run_ml_audit.py` on `ml/data.csv` (61,520 samples across 3,076 unique payments). Partitioned strictly by `payment_id` ($TrainGroups \cap ValGroups = \emptyset$) to eliminate counterfactual leakage across trials:
 
-**AI lift vs. rule-based: +6.61% → ≈ ₹512K additional recovered revenue**
+| Model Architecture | ROC-AUC | PR-AUC | Brier Score Loss | Log Loss | ECE | Status |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Dummy (Prior Classifier)** | $0.5000 \pm 0.0000$ | $0.3310 \pm 0.0048$ | $0.2214 \pm 0.0016$ | $0.6349 \pm 0.0033$ | $0.0045 \pm 0.0039$ | Baseline |
+| **Logistic Regression (L2)** | $0.7697 \pm 0.0029$ | $0.5654 \pm 0.0067$ | $0.1749 \pm 0.0007$ | $0.4937 \pm 0.0015$ | $0.0080 \pm 0.0023$ | Linear Baseline |
+| **Random Forest (Raw)** | **$0.7897 \pm 0.0029$** | **$0.6036 \pm 0.0071$** | **$0.1699 \pm 0.0011$** | **$0.4836 \pm 0.0025$** | **$0.0124 \pm 0.0021$** | **Production Preferred** |
+| **Random Forest (Calibrated - Sigmoid)** | $0.7913 \pm 0.0033$ | $0.6062 \pm 0.0074$ | $0.1826 \pm 0.0012$ | $0.5416 \pm 0.0036$ | $0.0975 \pm 0.0029$ | Degraded Calibration |
+| **Random Forest (Calibrated - Isotonic)** | $0.7884 \pm 0.0028$ | $0.6028 \pm 0.0073$ | $0.1706 \pm 0.0011$ | $0.4901 \pm 0.0026$ | $0.0163 \pm 0.0024$ | Sub-fold Overfitting |
 
-Across 5 independent seeds: mean lift **+6.85%** ± 1.05 pp, positive on all 5 runs.
+> **Key Calibration Finding:** Platt/Sigmoid scaling artificially pushes predictions toward the class prior ($0.33$), severely degrading probability quality (Brier score +7.5%, ECE ~8x increase). **Raw Random Forest is chosen as the production model** because it produces genuine, well-calibrated ensemble probabilities with the lowest proper scoring rule losses.
 
-> These are **local simulator / controlled experiment results** — not production Razorpay traffic claims.
+### 2. Controlled Experiment & Net Economics (10,000 Payments, Seed 42)
+
+Counterfactual outcomes generated using Common Random Numbers (CRN) variance reduction (`random.Random(f"{payment_id}:{action}")`):
+
+| Strategy | Recovered | Rate | Gross Revenue | Intervention Cost | Net Recovered Revenue | Net Revenue / Failure |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| 🔴 **Naive Always-Retry** | 1,173 | 39.39% | ₹6.03M | ₹5,956 | ₹6,025,252 | ₹2,023.25 |
+| 🟡 **Rule-Based Heuristic** | 1,529 | 51.34% | ₹7.74M | ₹4,297 | ₹7,739,508 | ₹2,598.89 |
+| 🟢 **AI EV Engine** | **1,616** | **54.26%** | **₹8.26M** | **₹4,013** | **₹8,251,900** | **₹2,770.95** |
+
+* **AI Net Lift vs Rule-Based:** **+6.62% (+₹512,392 net revenue)** while spending **6.6% less** on intervention fees.
+* **AI Action Distribution:** `SEND_REMINDER` (45.8%), `RETRY_LATER` (40.1%), `NO_ACTION` (11.7%), `RETRY_NOW` (2.4%). Avoids 57% of unnecessary gateway load compared to naive retry.
+* Across 5 independent seeds: mean lift **+6.85% ± 1.05 pp**, positive on all 5 runs.
+
+> *Note:* These are **local simulator / controlled experiment results under CRN assumptions** — not real-world live traffic claims.
 
 ---
 
@@ -251,7 +274,10 @@ Individual inclusion proofs are generated and independently verifiable.
 |---|:---:|---|
 | Random Forest decision model | ✅ Implemented | `ml/model.pkl`, 59K training rows |
 | Expected Value optimization | ✅ Implemented | `EV(a) = P × amount − cost` |
-| Thompson Sampling (Beta-Bernoulli) | ✅ Implemented | PostgreSQL `bandit_posterior` table |
+| Thompson Sampling (Beta-Bernoulli) | ✅ Implemented | Context-segmented Beta posteriors per failure code |
+| Leak-free ML Cross-Validation | ✅ GroupKFold | Grouped by payment_id (Train ∩ Test = ∅) |
+| Python Offline Test Suite | ✅ 103 passing | 0 failures, 100% offline isolated (126s) |
+| Go Microservices Test Suite | ✅ 100% passing | recovery-executor, worker, events |
 | SHAP model explanations | ✅ Implemented | `shap.TreeExplainer` on real RF model |
 | Deterministic policy gate | ✅ Implemented | `P < 0.50` → NO_ACTION |
 | Kafka event processing | ✅ Implemented | `recovery.payment.failed` topic |
@@ -270,6 +296,11 @@ Individual inclusion proofs are generated and independently verifiable.
 ---
 
 ## Documentation
+
+### Primary Portfolio & Architecture Reports
+
+- **[Portfolio Applied ML & Systems Architecture Report](docs/PORTFOLIO_APPLIED_ML_SYSTEMS_REPORT.md)** — Comprehensive technical evaluation report detailing leakage elimination, 5-fold GroupKFold benchmarking, the calibration discrepancy resolution, contextual bandit regret tracking, net economic modeling, and distributed systems hardening.
+- **[Backend System and Model Performance Report](docs/BACKEND_SYSTEM_AND_MODEL_PERFORMANCE_REPORT.md)** — Historical metrics lineage reconciliation, Go microservice latency benchmarks, and resilience verification.
 
 ### Architecture and Product
 
@@ -542,17 +573,22 @@ cd frontend && npm install && npm run dev
 ## Testing & ML Auditing
 
 ```bash
-# Python unit tests (fast, leak-free, zero network dependencies) — 94 tests passing
+# 1. Python unit tests (103 passing, zero network dependencies, 100% offline)
 python -m pytest -m "not integration"
 
-# Reproducible ML Benchmark Audit (5-Fold GroupKFold cross-validation)
+# 2. Reproducible ML Benchmark Audit (5-Fold GroupKFold cross-validation)
 python run_ml_audit.py
 
-# Go test suite — unit + integration + mock isolation
-cd backend/go-executor
-go test ./...
+# 3. Go test suite — unit + integration + backpressure + circuit breaker (100% passing)
+cd backend/go-executor && go test ./... && cd ../..
 
-# Full Portfolio Applied ML & Systems Report
+# 4. Contextual bandit simulation & regret verification
+python -m pytest tests/test_contextual_bandit.py -v
+
+# 5. Controlled experiment net economics verification
+python -m pytest tests/test_controlled_experiment.py -v
+
+# 6. Read the complete audit report:
 # See docs/PORTFOLIO_APPLIED_ML_SYSTEMS_REPORT.md
 ```
 
