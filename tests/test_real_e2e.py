@@ -1,6 +1,9 @@
+import pytest
 import psycopg
 
 from backend.recovery_pipeline import RecoveryPipeline
+
+pytestmark = pytest.mark.integration
 
 
 DATABASE_URL = (

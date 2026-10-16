@@ -114,6 +114,7 @@ class RecoveryPipeline:
             eligible_actions=list(probabilities.keys()),
             amount=amount,
             model_probabilities=probabilities,
+            context=context,
         )
         recommended_action = bandit_result["selected_action"]
 
@@ -158,6 +159,7 @@ class RecoveryPipeline:
             self.bandit.update(
                 action=executed_action,
                 success=bool(execution_result.get("recovered", False)),
+                context=context,
             )
 
         audit_event = create_audit_event(

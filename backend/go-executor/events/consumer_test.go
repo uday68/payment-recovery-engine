@@ -25,6 +25,7 @@ func (h *testEventHandler) Handle(event PaymentFailedEvent) error {
 }
 
 func TestKafkaConsumerDeliversPaymentFailedEvent(t *testing.T) {
+	skipIfKafkaUnavailable(t)
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: []string{"localhost:9092"},
 		Topic:   "recovery.payment.failed",
@@ -90,6 +91,7 @@ func TestKafkaConsumerDeliversPaymentFailedEvent(t *testing.T) {
 	}
 }
 func TestKafkaConsumerDoesNotCommitWhenHandlerFails(t *testing.T) {
+	skipIfKafkaUnavailable(t)
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: []string{"localhost:9092"},
 		Topic:   "recovery.payment.failed",
@@ -146,6 +148,7 @@ func TestKafkaConsumerDoesNotCommitWhenHandlerFails(t *testing.T) {
 	}
 }
 func TestConsumerCommitsOnlyAfterSuccessfulHandler(t *testing.T) {
+	skipIfKafkaUnavailable(t)
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: []string{"localhost:9092"},
 		Topic:   "recovery.payment.failed",

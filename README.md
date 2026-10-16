@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 # ⚡ Razorpay AI Revenue Recovery Engine
 
@@ -539,24 +539,21 @@ cd frontend && npm install && npm run dev
 
 ---
 
-## Testing
+## Testing & ML Auditing
 
 ```bash
-# Python — 104 tests
-pytest tests/ backend/api/ -v
+# Python unit tests (fast, leak-free, zero network dependencies) — 94 tests passing
+python -m pytest -m "not integration"
 
-# Go — unit + integration + race detector
+# Reproducible ML Benchmark Audit (5-Fold GroupKFold cross-validation)
+python run_ml_audit.py
+
+# Go test suite — unit + integration + mock isolation
 cd backend/go-executor
-go test -race ./...
+go test ./...
 
-# Frontend — TypeScript check + production bundle
-cd frontend && npm run build
-
-# Controlled 3-way experiment
-python backend/run_experiment.py
-
-# Stability benchmark (5 independent seeds)
-python backend/run_stability.py
+# Full Portfolio Applied ML & Systems Report
+# See docs/PORTFOLIO_APPLIED_ML_SYSTEMS_REPORT.md
 ```
 
 ---

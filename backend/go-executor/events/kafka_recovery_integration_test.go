@@ -10,6 +10,7 @@ import (
 )
 
 func TestKafkaDrivesRecoveryFlow(t *testing.T) {
+	skipIfKafkaUnavailable(t)
 	topic := "recovery.payment.failed"
 
 	reader := kafka.NewReader(kafka.ReaderConfig{

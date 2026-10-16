@@ -46,15 +46,14 @@ def generate_customers(num_customers:int)->list[Customer]:
             if random.random()  < recovery_chance:
                 recovered+=1
 
-            customers.append(
-                Customer(
-                    id =str(uuid.uuid4()),
-                    successful_payments=successful,
-                    failed_payments= failed,
-                    recovered_payments=recovered,
-
-                )
+        customers.append(
+            Customer(
+                id=str(uuid.uuid4()),
+                successful_payments=successful,
+                failed_payments=failed,
+                recovered_payments=recovered,
             )
+        )
 
     return customers
 

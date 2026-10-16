@@ -2,8 +2,10 @@ import pandas as pd
 from pathlib import Path
 
 from sklearn.compose import ColumnTransformer
+from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.calibration import CalibratedClassifierCV
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
@@ -23,7 +25,7 @@ CATEGORICAL_FEATURES = [
 ]
 
 
-def build_pipeline():
+def build_pipeline(model_type: str = "random_forest", calibrate: bool = False, calibrate_cv: int = 3):
     preprocessor = ColumnTransformer(
         transformers=[
             (
@@ -41,16 +43,29 @@ def build_pipeline():
         ]
     )
 
-    model = RandomForestClassifier(
-        n_estimators=100,
-        random_state=42,
-        n_jobs=-1,
-    )
+    if model_type == "dummy":
+        base_model = DummyClassifier(strategy="prior")
+    elif model_type == "logistic":
+        base_model = LogisticRegression(max_iter=1000, random_state=42)
+    elif model_type == "random_forest":
+        base_model = RandomForestClassifier(
+            n_estimators=100,
+            random_state=42,
+            n_jobs=-1,
+        )
+    else:
+        raise ValueError(f"Unknown model_type: {model_type}")
+
+    if calibrate and model_type != "dummy":
+        cv = calibrate_cv if calibrate_cv is not None else 3
+        estimator = CalibratedClassifierCV(base_model, method="sigmoid", cv=cv)
+    else:
+        estimator = base_model
 
     return Pipeline(
         steps=[
             ("preprocessor", preprocessor),
-            ("model", model),
+            ("model", estimator),
         ]
     )
 

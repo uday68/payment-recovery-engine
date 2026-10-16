@@ -32,7 +32,7 @@ func TestPostgresCommandStoreClaimsOnlyOnce(t *testing.T) {
 	)
 
 	if err != nil {
-		t.Fatalf("failed to create store: %v", err)
+		t.Skipf("Skipping integration test: Postgres store unavailable: %v", err)
 	}
 
 	commandID := "postgres-test-001"

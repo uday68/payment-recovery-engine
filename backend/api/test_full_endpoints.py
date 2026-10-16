@@ -1,7 +1,10 @@
+import pytest
 from fastapi.testclient import TestClient
 from backend.api.app import app
 from backend.audit_repository import AuditRepository
 from backend.audit import create_audit_event
+
+pytestmark = pytest.mark.integration
 
 client = TestClient(app)
 DB_URL = "postgres://recovery:recovery@localhost:5432/recovery_engine?sslmode=disable"

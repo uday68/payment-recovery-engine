@@ -24,7 +24,7 @@ func TestKafkaConcurrentRecoveryWorkers(t *testing.T) {
 
 	conn, err := kafka.Dial("tcp", "localhost:9092")
 	if err != nil {
-		t.Fatalf("failed to dial kafka: %v", err)
+		t.Skipf("Skipping integration test: failed to dial kafka: %v", err)
 	}
 	defer conn.Close()
 

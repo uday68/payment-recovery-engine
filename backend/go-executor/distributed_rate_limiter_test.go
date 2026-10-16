@@ -3,13 +3,23 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 )
 
+func skipIfRedisUnavailable(t *testing.T, addr string) {
+	conn, err := net.DialTimeout("tcp", addr, 200*time.Millisecond)
+	if err != nil {
+		t.Skipf("Skipping integration test: Redis not reachable at %s: %v", addr, err)
+	}
+	conn.Close()
+}
+
 func TestDistributedRateLimiter_AllowedWithinLimit(t *testing.T) {
+	skipIfRedisUnavailable(t, "localhost:6379")
 	limiter := NewDistributedRateLimiter("localhost:6379", "", 0, true)
 	defer limiter.Close()
 
@@ -49,6 +59,7 @@ func TestDistributedRateLimiter_AllowedWithinLimit(t *testing.T) {
 }
 
 func TestDistributedRateLimiter_ConcurrentGoroutines(t *testing.T) {
+	skipIfRedisUnavailable(t, "localhost:6379")
 	limiter := NewDistributedRateLimiter("localhost:6379", "", 0, true)
 	defer limiter.Close()
 

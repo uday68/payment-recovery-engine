@@ -9,6 +9,7 @@ import (
 )
 
 func TestKafkaPublisherPublishesPaymentFailedEvent(t *testing.T) {
+	skipIfKafkaUnavailable(t)
 	writer := &kafka.Writer{
 		Addr:                   kafka.TCP("127.0.0.1:9092"),
 		Topic:                  "recovery.payment.failed",

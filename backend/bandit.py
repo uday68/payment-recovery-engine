@@ -33,10 +33,13 @@ class ThompsonSamplingBandit:
         amount: float = 0.0,
         model_probabilities: Optional[Dict[str, float]] = None,
         action_costs: Optional[Dict[str, float]] = None,
+        context: Optional[Dict[str, Any]] = None,
+        margin: float = 1.0,
     ) -> Dict[str, Any]:
         """
         Samples an action using Thompson Sampling over Beta posteriors,
-        weighted by Expected Value (Sampled Prob * Amount - Cost).
+        weighted by Expected Value (Sampled Prob * Margin * Amount - Cost).
+        NO_ACTION strictly evaluates to 0 recovery probability and 0 Expected Value.
         
         Strict constraint: The returned action MUST be within eligible_actions.
         """
@@ -56,7 +59,19 @@ class ThompsonSamplingBandit:
         posterior_means: Dict[str, float] = {}
 
         for action in eligible_actions:
-            arm_data = arms.get(action, {"alpha": 1.0, "beta": 1.0})
+            if action == "NO_ACTION":
+                sampled_probs[action] = 0.0
+                posterior_means[action] = 0.0
+                sampled_evs[action] = 0.0
+                continue
+
+            arm_key = action
+            if context and "failure_code" in context:
+                candidate_key = f"{context['failure_code']}:{action}"
+                if candidate_key in arms:
+                    arm_key = candidate_key
+
+            arm_data = arms.get(arm_key, arms.get(action, {"alpha": 1.0, "beta": 1.0}))
             alpha = max(arm_data.get("alpha", 1.0), 0.01)
             beta_param = max(arm_data.get("beta", 1.0), 0.01)
 
@@ -66,7 +81,6 @@ class ThompsonSamplingBandit:
             # If model probabilities are supplied, optionally blend as informed prior
             if model_probabilities and action in model_probabilities:
                 model_p = model_probabilities[action]
-                # Combine posterior sample with ML probability signal
                 effective_prob = 0.7 * sampled_theta + 0.3 * model_p
             else:
                 effective_prob = sampled_theta
@@ -74,9 +88,9 @@ class ThompsonSamplingBandit:
             sampled_probs[action] = round(effective_prob, 4)
             posterior_means[action] = round(alpha / (alpha + beta_param), 4)
 
-            # Compute sampled Expected Value: P(recovery) * amount - cost
+            # Compute sampled Expected Value: P(recovery) * (margin * amount) - cost
             cost = costs.get(action, 0.0)
-            sampled_ev = (effective_prob * amount) - cost
+            sampled_ev = (effective_prob * amount * margin) - cost
             sampled_evs[action] = round(sampled_ev, 2)
 
         # Select action with maximum sampled Expected Value
@@ -90,14 +104,23 @@ class ThompsonSamplingBandit:
             "all_arms": arms,
         }
 
-    def update(self, action: str, success: bool) -> bool:
+    def update(
+        self,
+        action: str,
+        success: bool,
+        context: Optional[Dict[str, Any]] = None,
+    ) -> bool:
         """
         Records the real recovery outcome into the posterior distribution.
         success=True  -> reward = 1.0 (recovery succeeded)
         success=False -> reward = 0.0 (recovery failed)
         """
         reward = 1.0 if success else 0.0
-        return self.repository.update_posterior(action, reward)
+        res = self.repository.update_posterior(action, reward)
+        if context and "failure_code" in context:
+            ctx_key = f"{context['failure_code']}:{action}"
+            self.repository.update_posterior(ctx_key, reward)
+        return res
 
     def get_state(self) -> Dict[str, Any]:
         """

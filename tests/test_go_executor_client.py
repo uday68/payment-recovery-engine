@@ -1,5 +1,8 @@
+import pytest
 from backend.go_executor_client import GoExecutorClient
 import uuid
+
+pytestmark = pytest.mark.integration
 
 
 def test_go_executor_client_executes_command():

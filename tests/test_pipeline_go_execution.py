@@ -1,5 +1,8 @@
+import pytest
 from backend.recovery_pipeline import RecoveryPipeline
 import uuid
+
+pytestmark = pytest.mark.integration
 
 
 def test_pipeline_executes_recovery_through_go():

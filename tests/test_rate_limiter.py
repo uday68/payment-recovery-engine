@@ -7,6 +7,8 @@ import time
 import threading
 from backend.rate_limiter import RedisDistributedRateLimiter
 
+pytestmark = pytest.mark.integration
+
 
 def test_rate_limiter_allowed_within_quota():
     """Verify standard rate limiting behavior within configured quota."""

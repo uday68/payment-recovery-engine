@@ -1,9 +1,25 @@
-from .train import train_model
 import pandas as pd
+from pathlib import Path
 from backend.decision.engine import choose_action
 
-def predict_action_probabilities(payment_context):
-    model = train_model()
+_MODEL_CACHE = None
+
+def get_or_load_model():
+    global _MODEL_CACHE
+    if _MODEL_CACHE is not None:
+        return _MODEL_CACHE
+
+    try:
+        from .model_store import load_model
+        _MODEL_CACHE = load_model()
+    except Exception:
+        from .train import train_model
+        _MODEL_CACHE = train_model()
+    return _MODEL_CACHE
+
+def predict_action_probabilities(payment_context, model=None):
+    if model is None:
+        model = get_or_load_model()
 
     predictions = {}
 

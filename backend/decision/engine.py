@@ -10,19 +10,30 @@ def expected_value(
     probability: float,
     amount: float,
     action: str,
+    margin: float = 1.0,
 ) -> float:
+    """
+    Calculates expected net economic recovery value for an action.
+    NO_ACTION produces 0 recovery, so its gross recovery is always 0.
+    """
+    if action == "NO_ACTION":
+        return 0.0
 
-    recovery_value = probability * amount
-    cost = ACTION_COSTS[action]
+    cost = ACTION_COSTS.get(action, 0.0)
+    recovery_value = float(probability) * float(amount) * float(margin)
 
-    return recovery_value - cost
+    return float(recovery_value - cost)
 
 
 def choose_action(
     amount: float,
     probabilities: dict[str, float],
+    margin: float = 1.0,
 ) -> dict:
-
+    """
+    Selects the action that maximizes net expected economic recovery value.
+    If all active actions yield negative EV, NO_ACTION (EV = 0) is chosen.
+    """
     values = {}
 
     for action, probability in probabilities.items():
@@ -30,6 +41,7 @@ def choose_action(
             probability,
             amount,
             action,
+            margin=margin,
         )
 
     best_action = max(

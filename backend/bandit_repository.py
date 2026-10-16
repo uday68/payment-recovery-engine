@@ -32,7 +32,7 @@ class BanditRepository:
             self.db_available = False
 
     def _connect(self):
-        return psycopg.connect(self.database_url)
+        return psycopg.connect(self.database_url, connect_timeout=1)
 
     def _create_table(self):
         with self._connect() as connection:
