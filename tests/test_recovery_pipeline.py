@@ -104,3 +104,59 @@ def test_pipeline_persists_execution_result_in_audit(monkeypatch):
     assert event["attempts"] == 2
     assert event["recovered"] is True
     assert event["retryable"] is False
+
+
+def test_pipeline_executor_failure_records_audit_and_preserves_consistency(monkeypatch):
+    """
+    Regression test: When the Go executor service raises a network timeout or connection error,
+    the pipeline must NOT crash unhandled. It must record outcome=EXECUTOR_ERROR, retryable=True,
+    and persist the audit event so the payment is not left in an inconsistent ghost-duplicate state.
+    """
+    import requests
+
+    pipeline = RecoveryPipeline(
+        go_executor_url="http://localhost:8080",
+    )
+
+    monkeypatch.setattr(
+        pipeline.audit_repository,
+        "claim_payment",
+        lambda payment_id: True,
+    )
+
+    saved_events = []
+    monkeypatch.setattr(
+        pipeline.audit_repository,
+        "save",
+        lambda event: saved_events.append(event),
+    )
+
+    def fail_execute(command):
+        raise requests.exceptions.ConnectTimeout("Connection to Go executor timed out after 5s")
+
+    monkeypatch.setattr(
+        pipeline.go_executor,
+        "execute",
+        fail_execute,
+    )
+
+    result = pipeline.process_payment(
+        payment_id="pay-fail-timeout-001",
+        customer_id="cust-timeout",
+        amount=5000,
+        failure_code="BANK_TIMEOUT",
+        success_rate=0.8,
+        recovery_rate=0.6,
+        payment_method="UPI",
+        bank="HDFC",
+    )
+
+    assert result["recovered"] is False
+    assert result["execution_result"]["outcome"] == "EXECUTOR_ERROR"
+    assert result["execution_result"]["retryable"] is True
+    assert "timed out" in result["execution_result"]["error"].lower()
+
+    # Invariant: An audit record MUST be persisted even on executor failure
+    assert len(saved_events) == 1
+    assert saved_events[0]["payment_id"] == "pay-fail-timeout-001"
+    assert saved_events[0]["outcome"] == "EXECUTOR_ERROR"

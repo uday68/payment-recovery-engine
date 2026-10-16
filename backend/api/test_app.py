@@ -120,3 +120,40 @@ def test_recovery_decision_returns_real_decision_values():
         "SEND_REMINDER",
         "NO_ACTION",
     }
+
+
+def test_recovery_decision_policy_block_sets_ev_to_zero(monkeypatch):
+    """
+    Regression test: When the policy gate blocks the recommended action and forces NO_ACTION,
+    the returned expected_value MUST be 0.0, not the positive EV of the blocked action.
+    """
+    from backend.policy.engine import update_policy_config, PolicyConfig
+
+    # Pause autonomous recovery so all actions are blocked and forced to NO_ACTION
+    original_config = update_policy_config(PolicyConfig(auto_recovery_enabled=False))
+
+    try:
+        response = client.post(
+            "/v1/recovery/decide",
+            json={
+                "event_id": "evt-policy-blocked-001",
+                "event_type": "PAYMENT_FAILED",
+                "payment_id": "pay-blocked-001",
+                "customer_id": "cust-001",
+                "amount": 10000,
+                "payment_method": "UPI",
+                "bank": "HDFC",
+                "failure_code": "BANK_TIMEOUT",
+                "timestamp": "2026-09-04T08:00:00Z",
+                "success_rate": 0.80,
+                "recovery_rate": 0.50,
+            },
+        )
+        assert response.status_code == 200
+        body = response.json()
+
+        assert body["action"] == "NO_ACTION"
+        assert body["expected_value"] == 0.0
+    finally:
+        # Restore configuration
+        update_policy_config(original_config)

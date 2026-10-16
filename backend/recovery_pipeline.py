@@ -138,14 +138,40 @@ class RecoveryPipeline:
         )
 
         if self.go_executor is not None:
-            execution_result = self.go_executor.execute(command)
+            try:
+                execution_result = self.go_executor.execute(command)
+            except Exception as exc:
+                execution_result = {
+                    "command_id": command.get("command_id"),
+                    "payment_id": payment_id,
+                    "action": executed_action,
+                    "status": "FAILED",
+                    "recovered": False,
+                    "retryable": True,
+                    "outcome": "EXECUTOR_ERROR",
+                    "attempts": 1,
+                    "error": str(exc),
+                }
         else:
-            execution_result = self.executor.execute(
-                command=command,
-                customer_success_rate=success_rate,
-                customer_recovery_rate=recovery_rate,
-                failure_code=failure_code,
-            )
+            try:
+                execution_result = self.executor.execute(
+                    command=command,
+                    customer_success_rate=success_rate,
+                    customer_recovery_rate=recovery_rate,
+                    failure_code=failure_code,
+                )
+            except Exception as exc:
+                execution_result = {
+                    "command_id": command.get("command_id"),
+                    "payment_id": payment_id,
+                    "action": executed_action,
+                    "status": "FAILED",
+                    "recovered": False,
+                    "retryable": True,
+                    "outcome": "EXECUTOR_ERROR",
+                    "attempts": 1,
+                    "error": str(exc),
+                }
 
         if "retryable" not in execution_result:
             execution_result["retryable"] = False

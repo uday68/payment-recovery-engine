@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"runtime"
 	"sync"
 	"time"
@@ -285,7 +286,10 @@ func systemNodesHandler(startTime time.Time, metrics *RecoveryMetrics) http.Hand
 }
 
 func main() {
-	databaseURL := "postgres://recovery:recovery@localhost:5432/recovery_engine?sslmode=disable"
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL == "" {
+		databaseURL = "postgres://recovery:recovery@localhost:5432/recovery_engine?sslmode=disable"
+	}
 
 	store, err := NewPostgresCommandStore(databaseURL)
 	if err != nil {

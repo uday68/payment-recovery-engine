@@ -124,6 +124,11 @@ app.add_middleware(
 
 model = load_model()
 DB_URL = "postgres://recovery:recovery@localhost:5432/recovery_engine?sslmode=disable"
+
+
+def _db_connect():
+    return psycopg.connect(DB_URL, connect_timeout=1)
+
 bandit_engine = ThompsonSamplingBandit(database_url=DB_URL)
 rate_limiter_engine = RedisDistributedRateLimiter.get_instance()
 
@@ -219,7 +224,7 @@ def _fetch_live_node_status() -> NodeStatus:
 def _get_db_trajectory() -> List[TrajectoryPoint]:
     trajectory: List[TrajectoryPoint] = []
     try:
-        with psycopg.connect(DB_URL) as conn:
+        with _db_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT 
@@ -309,8 +314,12 @@ def decide_recovery(request: RecoveryDecisionRequest) -> RecoveryDecisionRespons
         expected_value=decision["expected_value"],
     )
     final_action = policy["action"]
-    final_prob = probabilities.get(final_action, selected_probability)
-    final_ev = decision["expected_value"]
+    if final_action == "NO_ACTION":
+        final_prob = probabilities.get("NO_ACTION", 0.0)
+        final_ev = 0.0
+    else:
+        final_prob = probabilities.get(final_action, selected_probability)
+        final_ev = decision["all_values"].get(final_action, decision["expected_value"])
 
     return RecoveryDecisionResponse(
         payment_id=request.payment_id,
@@ -407,7 +416,7 @@ def get_recovery_transactions(
     transactions: List[TransactionItem] = []
 
     try:
-        with psycopg.connect(DB_URL) as conn:
+        with _db_connect() as conn:
             with conn.cursor() as cur:
                 query = """
                     SELECT
@@ -603,7 +612,7 @@ def get_overview_summary() -> OverviewSummaryResponse:
     active_in_flight = 0
 
     try:
-        with psycopg.connect(DB_URL) as conn:
+        with _db_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT COALESCE(SUM(amount), 0), COUNT(*) FROM recovery_audit")
                 row = cur.fetchone()
@@ -755,7 +764,7 @@ def get_policies() -> List[PolicyItem]:
     p1_circuit = 0
     p2_hops = 0
     try:
-        with psycopg.connect(DB_URL) as conn:
+        with _db_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT 
@@ -823,7 +832,7 @@ def simulate_policy_sandbox(req: PolicySimulateRequest) -> PolicySimulateRespons
     base_rate = 0.0
     base_rev = 0.0
     try:
-        with psycopg.connect(DB_URL) as conn:
+        with _db_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT COALESCE(SUM(amount), 0) FROM recovery_audit")
                 tot = cur.fetchone()[0] or 0.0
@@ -886,7 +895,7 @@ def get_audit_ledger(limit: int = Query(25, ge=1, le=100)) -> AuditLedgerRespons
 
     total_count = len(entries)
     try:
-        with psycopg.connect(DB_URL) as conn:
+        with _db_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT COUNT(*) FROM recovery_audit")
                 cnt = cur.fetchone()[0]
@@ -1016,7 +1025,7 @@ def get_metrics() -> dict:
         except Exception:
             continue
     try:
-        with psycopg.connect(DB_URL) as conn:
+        with _db_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT COUNT(*), COUNT(CASE WHEN recovered THEN 1 END), COALESCE(SUM(CASE WHEN recovered THEN amount ELSE 0 END), 0) FROM recovery_audit")
                 row = cur.fetchone()
@@ -1056,7 +1065,7 @@ def explain_payment(payment_id: str) -> SHAPExplanationResponse:
     # Try fetching transaction context from database
     tx = None
     try:
-        with psycopg.connect(DB_URL) as conn:
+        with _db_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
@@ -1113,7 +1122,7 @@ def _build_rfc6962_tree_from_db():
     leaves = []
     records = []
     try:
-        with psycopg.connect(DB_URL) as conn:
+        with _db_connect() as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """

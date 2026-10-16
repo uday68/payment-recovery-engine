@@ -7,9 +7,8 @@ import time
 import threading
 from backend.rate_limiter import RedisDistributedRateLimiter
 
-pytestmark = pytest.mark.integration
 
-
+@pytest.mark.integration
 def test_rate_limiter_allowed_within_quota():
     """Verify standard rate limiting behavior within configured quota."""
     limiter = RedisDistributedRateLimiter(host="localhost", port=6379)
@@ -32,6 +31,7 @@ def test_rate_limiter_allowed_within_quota():
     assert res_blocked["remaining_tokens"] == 0
 
 
+@pytest.mark.integration
 def test_rate_limiter_multithreaded_concurrency():
     """Verify atomic token accounting under concurrent worker threads."""
     limiter = RedisDistributedRateLimiter(host="localhost", port=6379)
