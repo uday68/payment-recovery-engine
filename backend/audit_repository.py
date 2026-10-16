@@ -4,11 +4,15 @@ import psycopg
 
 
 class AuditRepository:
+    _shared_in_memory_audit = {}
+    _shared_payment_claims = set()
+    _shared_command_claims = set()
+
     def __init__(self, database_url="postgresql://recovery:recovery@localhost:5432/recovery_engine"):
         self.database_url = database_url
-        self._in_memory_audit = {}
-        self._in_memory_payment_claims = set()
-        self._in_memory_command_claims = set()
+        self._in_memory_audit = self._shared_in_memory_audit
+        self._in_memory_payment_claims = self._shared_payment_claims
+        self._in_memory_command_claims = self._shared_command_claims
         self.db_available = False
 
         if database_url and database_url != "memory://":

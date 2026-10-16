@@ -469,6 +469,33 @@ def get_recovery_transactions(
     except Exception as e:
         print(f"Database query note: {e}")
 
+    if not transactions and AuditRepository._shared_in_memory_audit:
+        for p_id, rec in list(AuditRepository._shared_in_memory_audit.items()):
+            recovered = bool(rec.get("recovered", False))
+            status_val = "RECOVERED" if recovered else ("ROUTING" if rec.get("executed_action") in ("RETRY_NOW", "RETRY_LATER") else "FAILED")
+            bank_val = rec.get("bank") or "UNAVAILABLE"
+            method_val = rec.get("payment_method") or "UNAVAILABLE"
+            raw_ts = rec.get("timestamp")
+            time_val = raw_ts.strftime("%H:%M:%S.%f")[:-3] if hasattr(raw_ts, "strftime") else (str(raw_ts) if raw_ts else "UNAVAILABLE")
+            transactions.append(
+                TransactionItem(
+                    payment_id=rec["payment_id"],
+                    customer_id=rec.get("customer_id", "unknown"),
+                    amount=float(rec.get("amount", 0.0)),
+                    failure_code=rec.get("failure_code", "UNKNOWN"),
+                    method=method_val,
+                    bank=bank_val,
+                    expected_value=float(rec.get("expected_value", 0.0)),
+                    action=rec.get("executed_action") or rec.get("recommended_action") or "NO_ACTION",
+                    status=status_val,
+                    outcome=rec.get("outcome"),
+                    attempts=int(rec.get("attempts", 1)),
+                    recovered=recovered,
+                    retryable=bool(rec.get("retryable", False)),
+                    timestamp=time_val,
+                )
+            )
+
     if gateway and gateway.upper() != "ALL":
         transactions = [t for t in transactions if (t.bank or "").upper() == gateway.upper()]
     if status and status.upper() != "ALL":
@@ -1148,19 +1175,35 @@ def _build_rfc6962_tree_from_db():
         pass
 
     if not leaves:
-        # Seed default deterministic leaves so tree is always queryable
-        for i in range(4):
-            rec = {
-                "id": i + 1,
-                "payment_id": f"pay_seed_{i+1}",
-                "customer_id": f"cust_{i+1}",
-                "amount": 1000.0 * (i + 1),
-                "executed_action": "RETRY_NOW",
-                "recovered": True,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            }
-            records.append(rec)
-            leaves.append(canonical_leaf_bytes(rec))
+        if AuditRepository._shared_in_memory_audit:
+            for idx, (p_id, rec) in enumerate(AuditRepository._shared_in_memory_audit.items()):
+                raw_ts = rec.get("timestamp")
+                ts_str = raw_ts.isoformat() if hasattr(raw_ts, "isoformat") else (str(raw_ts) if raw_ts else "")
+                r_item = {
+                    "id": idx + 1,
+                    "payment_id": rec["payment_id"],
+                    "customer_id": rec.get("customer_id", "cust_fallback"),
+                    "amount": float(rec.get("amount", 0.0)),
+                    "executed_action": rec.get("executed_action") or rec.get("recommended_action") or "RETRY_NOW",
+                    "recovered": bool(rec.get("recovered", False)),
+                    "timestamp": ts_str,
+                }
+                records.append(r_item)
+                leaves.append(canonical_leaf_bytes(r_item))
+        else:
+            # Seed default deterministic leaves so tree is always queryable
+            for i in range(4):
+                rec = {
+                    "id": i + 1,
+                    "payment_id": f"pay_seed_{i+1}",
+                    "customer_id": f"cust_{i+1}",
+                    "amount": 1000.0 * (i + 1),
+                    "executed_action": "RETRY_NOW",
+                    "recovered": True,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+                records.append(rec)
+                leaves.append(canonical_leaf_bytes(rec))
 
     tree = RFC6962MerkleTree(leaves)
     return tree, records
