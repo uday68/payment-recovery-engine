@@ -1,0 +1,21 @@
+# Global repository owners
+* @uday68
+
+# Go execution engine & concurrency primitives
+/backend/go-executor/ @uday68
+
+# Decision intelligence, EV optimization & machine learning
+/backend/decision/ @uday68
+/backend/policy/ @uday68
+/ml/ @uday68
+
+# Batch policy replay & PySpark jobs
+/batch/ @uday68
+
+# Frontend React Control Tower UI
+/frontend/ @uday68
+
+# Cryptographic Merkle ledgers & Audit infrastructure
+/backend/crypto_merkle.py @uday68
+/backend/audit_repository.py @uday68
+/backend/elasticsearch_client.py @uday68

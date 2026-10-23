@@ -2,723 +2,410 @@
 
 # ⚡ Autonomous Payment Revenue Recovery Engine
 
-### *Turn payment failures into recovered revenue — intelligently, reliably, and verifiably.*
+### *Enterprise-Grade Autonomous Decisioning, Distributed Execution, and Cryptographic Auditability for Payment Failures*
 
 <br/>
 
-[![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Go](https://img.shields.io/badge/Go-1.22-00ADD8?style=for-the-badge&logo=go&logoColor=white)](https://go.dev)
-[![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
-[![Kafka](https://img.shields.io/badge/Apache_Kafka-231F20?style=for-the-badge&logo=apache-kafka&logoColor=white)](https://kafka.apache.org)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://postgresql.org)
-[![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io)
+[![CI Pipeline](https://github.com/uday68/payment-recovery-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/uday68/payment-recovery-engine/actions/workflows/ci.yml)
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![Go 1.22](https://img.shields.io/badge/Go-1.22-00ADD8?style=flat-square&logo=go&logoColor=white)](https://go.dev)
+[![React 18](https://img.shields.io/badge/React-18.3-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
+[![Apache Kafka](https://img.shields.io/badge/Kafka-4.0-231F20?style=flat-square&logo=apache-kafka&logoColor=white)](https://kafka.apache.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://postgresql.org)
+[![Redis](https://img.shields.io/badge/Redis-7.0-DC382D?style=flat-square&logo=redis&logoColor=white)](https://redis.io)
+[![Elasticsearch](https://img.shields.io/badge/Elasticsearch-8.13-005571?style=flat-square&logo=elasticsearch&logoColor=white)](https://elastic.co)
+[![Apache Spark](https://img.shields.io/badge/PySpark-3.5-E25A1C?style=flat-square&logo=apache-spark&logoColor=white)](https://spark.apache.org)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=flat-square)](LICENSE)
 
 <br/>
 
-> **Autonomous Multi-Policy Payment Recovery & Audit Control Tower**
+**Production-grade payment recovery platform combining machine-learning probability estimation, expected economic value optimization ($EV(a)$), multi-armed bandit exploration, deterministic safety guardrails, high-throughput Go execution, and RFC 6962 cryptographic Merkle audit ledgers.**
 
 </div>
 
 ---
 
-## The Core Insight
+## Table of Contents
 
-Payment failures are not simply failed transactions — they are **revenue at risk**.
-
-A naive system retries everything. That wastes recovery budget on payments that will never succeed and misses high-value opportunities that needed a different intervention.
-
-This system asks a more precise question for every failure:
-
-> **Which recovery action has the highest expected economic value — and is it safe to execute?**
-
-The answer emerges from a layered pipeline:
-
-```
-AI Prediction  →  Economic Optimization  →  Thompson Sampling  →  Policy Gate  →  Reliable Execution
-```
-
-The AI never controls execution directly. The policy layer always has the final word.
+- [1. Executive Summary & Core Insight](#1-executive-summary--core-insight)
+- [2. System Architecture & Topology](#2-system-architecture--topology)
+- [3. Decision Science & Mathematical Foundations](#3-decision-science--mathematical-foundations)
+- [4. Distributed Systems & Reliability Engineering](#4-distributed-systems--reliability-engineering)
+- [5. Auditing, Cryptography & Search Infrastructure](#5-auditing-cryptography--search-infrastructure)
+- [6. Batch Policy Re-Evaluation Engine (PySpark)](#6-batch-policy-re-evaluation-engine-pyspark)
+- [7. Empirical Verification & Benchmark Matrix](#7-empirical-verification--benchmark-matrix)
+- [8. Repository Architecture & Layout](#8-repository-architecture--layout)
+- [9. Run Locally & Quickstart](#9-run-locally--quickstart)
+- [10. Production Standards & Quality Gates](#10-production-standards--quality-gates)
+- [11. Scope Boundaries & Known Limitations](#11-scope-boundaries--known-limitations)
+- [12. Governance & Security](#12-governance--security)
 
 ---
 
-## Mathematical Decision Model
+## 1. Executive Summary & Core Insight
 
-The recovery engine combines **supervised probability estimation** with
-**expected-value optimization**.
+Payment transaction declines are not merely failed database records — they represent **immediate revenue at risk**, heightened customer friction, and merchant churn.
 
-The key idea is:
+### The Naive Engineering Anti-Pattern
+Traditional payment stacks utilize static rule engines or unconstrained retry loops:
+* **Immediate Retries:** Spamming card networks when bank switches are experiencing downtime violates scheme rules (Visa/Mastercard excessive retry limits) and risks merchant terminal blacklisting.
+* **Blind Inaction:** Failing to re-engage recoverable payments (e.g. temporary rate limits, network timeouts, transient balance issues) leaks recoverable gross merchandise value (GMV).
+* **Static Heuristics:** Hardcoded failure-code mappings fail to adapt to real-time issuer switch health, cardholder payment context, or variable fee structures.
 
-> Predict the probability of recovery for every possible action, then choose the
-> action that maximizes expected recovered value after accounting for
-> intervention cost.
+### The System Solution
+This platform addresses payment recovery as a **constrained stochastic optimization problem**:
 
-### 1. Problem Formulation
+> **"Which intervention maximizes expected net economic recovery value, subject to strict policy guardrails, distributed rate limits, and zero double-execution risk?"**
 
-For a failed payment, let:
-
-- $X$ = payment/customer context
-- $A$ = candidate recovery action
-- $Y \in \{0,1\}$ = recovery outcome
-- $Y = 1$ = recovery succeeded
-- $Y = 0$ = recovery failed
-
-The system models:
-
-$$
-P(Y=1 \mid X,A)
-$$
-
-This is the probability that action $A$ successfully recovers a payment with
-context $X$.
-
-### 2. Context $X$
-
-The context contains information such as:
-
-$$
-X = (\mathrm{success\_rate},\ \mathrm{recovery\_rate},\ \mathrm{amount},\
-\mathrm{payment\_method},\ \mathrm{bank},\ \mathrm{failure\_code},\ \mathrm{hour})
-$$
-
-The action is included as an input feature because the same payment can have
-different recovery probabilities depending on the intervention.
-
-For example, the model evaluates each candidate action separately:
-
-```text
-Payment Context
-     + RETRY_NOW
-     -> P(recovery | context, RETRY_NOW)
-
-Payment Context
-     + RETRY_LATER
-     -> P(recovery | context, RETRY_LATER)
-
-Payment Context
-     + SEND_REMINDER
-     -> P(recovery | context, SEND_REMINDER)
+```
+Failed Payment Event ──► Probability Estimation ──► Economic Value Optimization ──► Thompson Sampling ──► Deterministic Policy Gate ──► Resilient Execution
 ```
 
-### 3. Expected-Value Optimization
-
-For each candidate recovery action, the engine estimates the net economic recovery value, explicitly accounting for intervention costs and merchant recovery margins:
-
-$$
-EV(a) = \begin{cases} 
-0.0 & \text{if } a = \text{NO\_ACTION} \\ 
-P(Y=1 \mid X, a) \cdot (\text{Margin} \times \text{Amount}) - \text{Cost}(a) & \text{otherwise} 
-\end{cases}
-$$
-
-Where intervention costs reflect actual payment gateway and customer messaging tariffs:
-* `RETRY_NOW`: ₹2.00
-* `RETRY_LATER`: ₹2.00
-* `SEND_REMINDER`: ₹1.00
-* `NO_ACTION`: ₹0.00
-
-If all active actions yield negative expected value (e.g. high retry cost on micro-transactions with low recovery probabilities, or zero merchant margin), the system mathematically selects:
-
-$$
-a^* = \arg\max_{a \in A} EV(a) = \text{NO\_ACTION}
-$$
-
-The selected action is then passed to Contextual Thompson Sampling and the deterministic policy gate. The policy gate has final authority and can replace the model's recommendation with `NO_ACTION` whenever confidence or margin conditions are violated.
+**Key Architectural Invariant:** Machine learning models only generate non-binding recommendations. Execution authority resides strictly in deterministic policy gates and idempotent execution workers.
 
 ---
 
-## Verified Results
+## 2. System Architecture & Topology
 
-### 1. Leak-Free ML Benchmark (5-Fold GroupKFold Cross-Validation)
-
-Evaluated via `python run_ml_audit.py` on `ml/data.csv` (61,520 samples across 3,076 unique payments). Partitioned strictly by `payment_id` ($TrainGroups \cap ValGroups = \emptyset$) to eliminate counterfactual leakage across trials:
-
-| Model Architecture | ROC-AUC | PR-AUC | Brier Score Loss | Log Loss | ECE | Status |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Dummy (Prior Classifier)** | $0.5000 \pm 0.0000$ | $0.3310 \pm 0.0048$ | $0.2214 \pm 0.0016$ | $0.6349 \pm 0.0033$ | $0.0045 \pm 0.0039$ | Baseline |
-| **Logistic Regression (L2)** | $0.7697 \pm 0.0029$ | $0.5654 \pm 0.0067$ | $0.1749 \pm 0.0007$ | $0.4937 \pm 0.0015$ | $0.0080 \pm 0.0023$ | Linear Baseline |
-| **Random Forest (Raw)** | **$0.7897 \pm 0.0029$** | **$0.6036 \pm 0.0071$** | **$0.1699 \pm 0.0011$** | **$0.4836 \pm 0.0025$** | **$0.0124 \pm 0.0021$** | **Production Preferred** |
-| **Random Forest (Calibrated - Sigmoid)** | $0.7913 \pm 0.0033$ | $0.6062 \pm 0.0074$ | $0.1826 \pm 0.0012$ | $0.5416 \pm 0.0036$ | $0.0975 \pm 0.0029$ | Degraded Calibration |
-| **Random Forest (Calibrated - Isotonic)** | $0.7884 \pm 0.0028$ | $0.6028 \pm 0.0073$ | $0.1706 \pm 0.0011$ | $0.4901 \pm 0.0026$ | $0.0163 \pm 0.0024$ | Sub-fold Overfitting |
-
-> **Key Calibration Finding:** Platt/Sigmoid scaling artificially pushes predictions toward the class prior ($0.33$), severely degrading probability quality (Brier score +7.5%, ECE ~8x increase). **Raw Random Forest is chosen as the production model** because it produces genuine, well-calibrated ensemble probabilities with the lowest proper scoring rule losses.
-
-### 2. Controlled Experiment & Net Economics (10,000 Payments, Seed 42)
-
-Counterfactual outcomes generated using Common Random Numbers (CRN) variance reduction (`random.Random(f"{payment_id}:{action}")`):
-
-| Strategy | Recovered | Rate | Gross Revenue | Intervention Cost | Net Recovered Revenue | Net Revenue / Failure |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| 🔴 **Naive Always-Retry** | 1,173 | 39.39% | ₹6.03M | ₹5,956 | ₹6,025,252 | ₹2,023.25 |
-| 🟡 **Rule-Based Heuristic** | 1,529 | 51.34% | ₹7.74M | ₹4,297 | ₹7,739,508 | ₹2,598.89 |
-| 🟢 **AI EV Engine** | **1,616** | **54.26%** | **₹8.26M** | **₹4,013** | **₹8,251,900** | **₹2,770.95** |
-
-* **AI Net Lift vs Rule-Based:** **+6.62% (+₹512,392 net revenue)** while spending **6.6% less** on intervention fees.
-* **AI Action Distribution:** `SEND_REMINDER` (45.8%), `RETRY_LATER` (40.1%), `NO_ACTION` (11.7%), `RETRY_NOW` (2.4%). Avoids 57% of unnecessary gateway load compared to naive retry.
-* Across 5 independent seeds: mean lift **+6.85% ± 1.05 pp**, positive on all 5 runs.
-
-> *Note:* These are **local simulator / controlled experiment results under CRN assumptions** — not real-world live traffic claims.
-
----
-
-## Architecture
-
-### Decision Pipeline
+The platform is architected as an asynchronous, event-driven distributed system separating decision intelligence (Python/FastAPI) from high-throughput execution (Go) and immutable audit persistence (PostgreSQL WAL, RFC 6962 Merkle Trees, and Elasticsearch).
 
 ```mermaid
 flowchart TD
-    FailedTx["Failed Payment Event<br/>(payment_id, amount, failure_code)"] --> Kafka["Apache Kafka Ingestion<br/>topic: recovery.payment.failed"]
-    Kafka --> Worker["Recovery Worker<br/>- Event Idempotency Check<br/>- Redis Distributed Rate Limiter"]
-    Worker --> ML["RandomForestClassifier Model<br/>P(recovery | context, action)"]
-    ML --> EV["Expected Value Optimization<br/>arg max EV(a) = P(a) * (Margin * Amount) - Cost(a)"]
-    EV --> Thompson["Contextual Thompson Sampling<br/>(Beta-Bernoulli Exploration)"]
-    Thompson --> Policy{"Deterministic Policy Gate<br/>P >= 0.50 & EV >= Floor"}
-    
-    Policy -- "Blocked / Low Confidence" --> NoAction["NO_ACTION<br/>(Preserve Budget, Trip Avoidance)"]
-    Policy -- "Approved" --> GoCmd["Recovery Command Dispatch"]
-    
-    GoCmd --> GoExec["Go Execution Engine<br/>- Per-Gateway Circuit Breaker<br/>- Distributed Redis Token Bucket<br/>- Exponential Backoff & Jitter"]
-    
-    GoExec --> Gateway["Payment Gateway (Simulated / Live)"]
-    Gateway --> Outcome{"Gateway Outcome"}
-    
-    Outcome -- "Success / Handled Failure" --> Postgres[("PostgreSQL ACID WAL<br/>recovery_audit")]
-    Outcome -- "Dead Letter Exception" --> KafkaDLQ["Kafka DLQ Topic<br/>recovery.payment.failed.dlq"]
-    
-    Postgres --> Merkle["RFC 6962 Cryptographic Merkle Tree<br/>SHA-256 Inclusion Proofs"]
-    Postgres --> ES["Elasticsearch Cluster<br/>Decision Audit Search"]
-    Postgres --> Spark["PySpark Batch Re-evaluation<br/>Counterfactual Policy Replay"]
+    subgraph Ingestion ["1. Ingestion Layer"]
+        TxFail["Payment Failure Event<br/>(payment_id, amount, failure_code)"] --> KafkaTopic["Apache Kafka Event Stream<br/>Topic: recovery.payment.failed"]
+    end
+
+    subgraph Processing ["2. Resilience & Rate Limiting"]
+        KafkaTopic --> Worker["Recovery Ingestion Worker<br/>- Distributed Token Bucket (Redis Lua)<br/>- Event Idempotency Check (PG)"]
+    end
+
+    subgraph Intelligence ["3. Decision Intelligence Engine (Python)"]
+        Worker --> Context["Context Assembler<br/>(History, Success Rate, Time, Bin)"]
+        Context --> Model["RandomForest Probability Estimator<br/>P(recovery | context, action)"]
+        Model --> EV["Expected Value Optimization<br/>arg max EV(a) = P(a) * (Margin * Amount) - Cost(a)"]
+        EV --> TS["Contextual Thompson Sampling<br/>(Beta-Bernoulli Exploration)"]
+        TS --> PolicyGate{"Deterministic Policy Gate<br/>P >= 0.50 & EV >= Floor"}
+    end
+
+    subgraph DecisionOutcome ["4. Policy Authorization"]
+        PolicyGate -- "REJECT / Low Confidence" --> NoAction["NO_ACTION<br/>(Suppress Dispatch, Protect Gateway)"]
+        PolicyGate -- "APPROVE" --> RecoveryCmd["Recovery Command Dispatch<br/>(Idempotency Key: command_id)"]
+    end
+
+    subgraph Execution ["5. Go Execution Microservice"]
+        RecoveryCmd --> GoExecutor["Go Execution Engine<br/>- Circuit Breaker (Per Gateway Switch)<br/>- Exponential Backoff & Jitter<br/>- In-Memory Backpressure Channels"]
+        GoExecutor --> GatewaySim["Banking Gateway / Processor Switch"]
+    end
+
+    subgraph Settlement ["6. Persistence & Observability"]
+        GatewaySim --> OutcomeState{"Execution Outcome"}
+        OutcomeState -- "SUCCESS / HANDLED" --> PGStore[("PostgreSQL ACID Store<br/>- recovery_audit<br/>- processed_events<br/>- executed_commands")]
+        OutcomeState -- "FATAL / RETRY EXHAUSTION" --> DLQ["Kafka Dead Letter Queue<br/>recovery.payment.failed.dlq"]
+        
+        PGStore --> Merkle["RFC 6962 Merkle Tree<br/>SHA-256 Inclusion Proofs"]
+        PGStore --> ES["Elasticsearch Cluster<br/>Decision Audit Search"]
+        PGStore --> Spark["PySpark Batch Re-evaluation<br/>Counterfactual Policy Replay"]
+    end
+
+    subgraph Presentation ["7. Control Tower UI"]
+        PGStore -.-> ReactUI["React 18 Control Tower<br/>(RTK Query, Merkle Verification, Forensics)"]
+        ES -.-> ReactUI
+    end
 ```
 
 ---
 
-### Failure & DLQ Path
+## 3. Decision Science & Mathematical Foundations
 
-```
-Primary Topic
-      │
-      ▼
-  Recovery Worker
-      │
-      ├─► [success]  ──► commit offset
-      │
-      └─► [failure]
-              │
-              ▼
-         bounded retry
-              │
-              ▼
-         DLQ Publisher ──► recovery.payment.failed.dlq
-              │
-              ▼
-         commit original offset
-              ↑
-         (never commit before DLQ ACK)
-```
+### 3.1 Problem Formulation
+For every failed payment transaction, let:
+* $X \in \mathcal{X}$: Context vector (customer transaction history, historical recovery rate, payment method, issuer bank code, failure category, hour of day).
+* $A = \{\text{RETRY\_NOW}, \text{RETRY\_LATER}, \text{SEND\_REMINDER}, \text{NO\_ACTION}\}$: Finite action space.
+* $Y \in \{0, 1\}$: Binary recovery outcome.
+* $M \in (0, 1]$: Merchant recovery margin (e.g. $1.0$ for gross merchant recovery, $0.02$ for payment aggregator MDR).
+* $C(a)$: Direct intervention fee tariff:
+  $$\text{Cost}(\text{RETRY\_NOW}) = \text{₹}2.00, \quad \text{Cost}(\text{RETRY\_LATER}) = \text{₹}2.00, \quad \text{Cost}(\text{SEND\_REMINDER}) = \text{₹}1.00, \quad \text{Cost}(\text{NO\_ACTION}) = \text{₹}0.00$$
 
----
+The supervised learning model estimates the conditional recovery probability for each candidate action:
+$$P(Y = 1 \mid X, a)$$
 
-### Audit Integrity — RFC 6962 Merkle Tree
+### 3.2 Expected Net Economic Value Optimization
+The system selects candidate actions by maximizing estimated net recovery profit:
 
-```
-           ┌─── Root Hash ───┐
-           │                 │
-        H(01)             H(23)
-       /      \          /      \
-    H(0)     H(1)     H(2)     H(3)
-      │        │        │        │
-   Audit0   Audit1   Audit2   Audit3
+$$EV(a) = \begin{cases} 
+0.0 & \text{if } a = \text{NO\_ACTION} \\ 
+P(Y = 1 \mid X, a) \cdot (M \times \text{Amount}) - C(a) & \text{otherwise} 
+\end{cases}$$
 
-Leaf hash:  SHA256(0x00 ‖ data)
-Node hash:  SHA256(0x01 ‖ H_left ‖ H_right)
-```
+$$a^* = \arg\max_{a \in A} EV(a)$$
 
-Individual inclusion proofs are generated and independently verifiable.
+If all active money-moving actions generate negative expected return (e.g., low-amount micro-transactions with high decline likelihood), the optimizer mathematically defaults to $a^* = \text{NO\_ACTION}$.
+
+### 3.3 Contextual Thompson Sampling (Exploration vs. Exploitation)
+To prevent model stagnation and continuously discover changing gateway behaviors, the engine incorporates a Bayesian multi-armed bandit layer. For each failure code cohort $c$ and action $a$, parameters $\alpha_{c,a}$ and $\beta_{c,a}$ maintain Beta posteriors over success rates:
+
+$$\theta_{a} \sim \text{Beta}(\alpha_{c, a},\, \beta_{c, a})$$
+
+The sampled posterior $\theta_{a}$ blends with the supervised model probability $\hat{p}(a)$ to dynamically explore non-consensus actions without sacrificing baseline safety.
+
+### 3.4 Deterministic Policy Guardrails
+The machine learning recommendation $a^*$ is evaluated by a hard policy engine before execution authorization:
+1. **Confidence Floor:** If $a \in \{\text{RETRY\_NOW}, \text{RETRY\_LATER}\}$ and $P(Y=1 \mid X, a) < 0.50$, the command is **BLOCKED** and replaced with $\text{NO\_ACTION}$.
+2. **Economic Floor:** If $EV(a) < \text{₹}50.00$ on credit/debit interventions, retries are suppressed to conserve processing budgets.
+3. **Emergency Circuit:** An administrator can globally suspend automated money-moving dispatch via `/v1/recovery/policies/config`.
 
 ---
 
-## Feature Status
+## 4. Distributed Systems & Reliability Engineering
 
-| Capability | Status | Notes |
-|---|:---:|---|
-| Random Forest decision model | ✅ Implemented | `ml/model.pkl`, 59K training rows |
-| Expected Value optimization | ✅ Implemented | `EV(a) = P × amount − cost` |
-| Thompson Sampling (Beta-Bernoulli) | ✅ Implemented | Context-segmented Beta posteriors per failure code |
-| Leak-free ML Cross-Validation | ✅ GroupKFold | Grouped by payment_id (Train ∩ Test = ∅) |
-| Python Offline Test Suite | ✅ 110 passing | 0 failures, 100% offline isolated (153s) |
-| Go Microservices Test Suite | ✅ 112 passing | recovery-executor, worker, events (100% PASS) |
-| Full API Endpoint Suite | ✅ 16 passing | RFC 6962 Merkle, SHAP, MAB, DLQ, rate limiting |
-| SHAP model explanations | ✅ Implemented | `shap.TreeExplainer` on real RF model |
-| Deterministic policy gate | ✅ Implemented | `P < 0.50` → NO_ACTION |
-| Kafka event processing | ✅ Implemented | `recovery.payment.failed` topic |
-| Kafka Dead Letter Queue | ✅ Implemented | `recovery.payment.failed.dlq`, acks=all |
-| Event idempotency | ✅ Implemented | PostgreSQL `processed_events` |
-| Command idempotency | ✅ Implemented | PostgreSQL `executed_commands` |
-| Distributed rate limiting | ✅ Implemented | Redis atomic Lua token bucket |
-| Go execution service | ✅ Implemented | Bounded retry + circuit breaker |
-| RFC 6962 Merkle audit proofs | ✅ Implemented | SHA-256, 0x00/0x01 prefix, verifiable |
-| PostgreSQL audit layer | ✅ Implemented | `recovery_audit` table, WAL-logged |
-| React Control Tower | ✅ Implemented | 8 live-data pages |
-| Controlled 4-way experiment | ✅ Implemented | Naive, Naive Rule, Expert Rule, AI Engine |
-| Real gateway integration | 🔬 Simulated | Local deterministic simulator |
-| Production deployment | 🔮 Future | Requires production infrastructure |
+### 4.1 Strict Idempotency Guarantees
+Payment networks must never double-debit or double-retry. The platform provides two tiers of idempotency:
+1. **Event Ingestion Idempotency:** The Kafka consumer checks PostgreSQL table `processed_events` before invoking decisioning. Duplicate events are acknowledged without re-execution.
+2. **Command Execution Idempotency:** Every dispatch command generates a deterministic UUID `command_id = SHA256(payment_id + action + attempt)`. The Go executor claims this key in PostgreSQL using atomic SQL transactions:
+   ```sql
+   INSERT INTO command_idempotency (command_id) VALUES ($1) ON CONFLICT (command_id) DO NOTHING RETURNING command_id;
+   ```
 
----
+### 4.2 Distributed Token Bucket Rate Limiting
+To protect upstream banking switches from synchronized retry surges, rate limiting is implemented via atomic Redis Lua scripts:
+* Evaluated dynamically per issuer bank (`limit:bank:{HDFC}`) and payment method (`limit:method:{UPI}`).
+* Supports burst allowances with continuous token replenishment.
+* If Redis is unreachable, the system fails open safely with local sliding-window in-memory limiters to maintain availability.
 
-## Empirical Verification & Test Matrix
+### 4.3 Cascading Failure Protection (Circuit Breakers)
+Every outbound gateway client in Go is wrapped in an adaptive Three-State Circuit Breaker (`Closed`, `Open`, `Half-Open`):
+* **Trip Condition:** 5 consecutive failures or error rate $> 50\%$ within a rolling 30-second window transitions state to `Open`.
+* **Fast-Failure:** Requests routed to an `Open` gateway fail immediately with $0\text{ms}$ latency, allowing the fallback scheduler to queue transactions for off-peak recovery (`RETRY_LATER`).
+* **Hysteresis Recovery:** After a 60-second cooldown, the breaker enters `Half-Open`, allowing a single trial request to verify upstream switch restoration.
 
-| Layer / Subsystem | Test Command | Scope / Coverage | Verified Result | Execution Time |
-| :--- | :--- | :--- | :--- | :--- |
-| **Python Unit Suite** | `python -m pytest -m "not integration"` | 47 test files (idempotency, decision policies, economic routing, bandits) | **110 / 110 PASS (100%)** | 153.02s |
-| **Full API Endpoints** | `python -m pytest backend/api/test_full_endpoints.py` | 16 full integration routes (RFC 6962 Merkle trees, SHAP, MAB, DLQ, rate limiting) | **16 / 16 PASS (100%)** | 130.72s |
-| **Go Microservice** | `cd backend/go-executor && go test -count=1 ./...` | Circuit breaker, token bucket, backpressure streaming, event deduplication | **112 / 112 PASS (100%)** | 15.67s |
-| **Frontend UI Build** | `cd frontend && npm run build` | React 18, TypeScript strict mode, Tailwind CSS, Vite packaging | **BUILD SUCCESS (0 errors)** | 3.05s |
-| **ML Leakage Audit** | `python run_ml_audit.py` | 5-Fold GroupKFold (`payment_id`), calibration curves, Brier, ECE, PR-AUC | **0 Leakage, Preferred Raw RF** | 128.45s |
-| **Payment Experiment** | `python backend/run_experiment.py` | 4-way benchmark on 10,000 transactions (Seed 42) | **4-Way Evaluated (AI 56.15%, 9% Safe Gating)** | 10.35s |
-| **Policy Stability** | `python backend/run_stability.py` | Robustness evaluation across 5 independent random seeds | **5 / 5 Seeds Positive (+7.67% ± 1.09%)** | 71.20s |
+### 4.4 Dead Letter Queue (DLQ) Two-Phase Commit
+Kafka consumers adhere strictly to reliable messaging invariants:
+* Messages that encounter poison-pill unparseable JSON or reach maximum bounded retries (3 attempts) are mirrored into `recovery.payment.failed.dlq` with full diagnostic failure headers.
+* **Invariant:** The consumer **never** commits the primary partition offset until Kafka returns an `acks=all` acknowledgment from the DLQ topic.
 
 ---
 
-## Documentation
+## 5. Auditing, Cryptography & Search Infrastructure
 
-### Engineering Audit & Phase Reports
+### 5.1 RFC 6962 Cryptographic Merkle Tree
+To guarantee non-repudiation and regulatory audit compliance, every logged recovery decision is appended to an in-memory and database-backed Merkle audit log conforming to RFC 6962 (Certificate Transparency standard):
+* **Domain Separation:** Leaf hashes prefix data with `0x00`; internal node hashes prefix children digests with `0x01` to prevent second preimage attacks:
+  $$\text{Leaf Hash} = \text{SHA-256}(0x00 \,\|\, \text{CanonicalAuditRecord})$$
+  $$\text{Node Hash} = \text{SHA-256}(0x01 \,\|\, \text{LeftChildHash} \,\|\, \text{RightChildHash})$$
+* **Inclusion Proofs:** `/v1/audit/proof/{payment_id}` yields an $O(\log N)$ cryptographic audit path, independently verifiable via `/v1/audit/verify-proof`.
 
-- **[Phase 1: Repository Audit, Reproducibility, & Correctness](docs/phase1-audit.md)** — Comprehensive architecture overview, service boundaries, identified defects, and risk register.
-- **[Phase 1: Empirical Test Baseline](docs/phase1-test-baseline.md)** — Initial baseline metrics and test pass rates across all layers.
-- **[Phase 1: Corrective Actions & Final Report](docs/phase1-final-report.md)** — Idempotency crash-safety resolution (P0), policy expected value consistency (P1), and database timeout fast-failure (P1).
-- **[Phase 2: Live Integration & Verification Report](docs/phase2-integration-report.md)** — Docker orchestration, shared in-memory resilience, full endpoint execution, and ML stability analysis.
-- **[Phase 2: Payment Simulator & Decision Engine Audit](docs/phase2-simulator-audit.md)** — In-depth evaluation of synthetic data generation, Common Random Numbers (CRN) counterfactual evaluation, baseline fairness, and in-domain oracle effects.
-- **[Phase 3: Contextual Decisioning, Fair Baselines, & Safe Exploration](docs/phase3-contextual-decisioning-report.md)** — 4-way benchmarking with Expert-Tuned rule baselines, 9.0% selectivity gating trade-offs, and Contextual Thompson Sampling formulation.
-- **[Phase 4: Experiment Methodology Audit](docs/phase4-experiment-methodology-audit.md)** — Full lifecycle tracing across 4 strategies, CRN isolation verification, and policy gating evaluation.
-- **[Phase 4: Economic & Operational Evaluation](docs/phase4-economic-evaluation.md)** — Multi-margin sensitivity analysis (100% gross down to 0.5% MDR), break-even dynamics, and unmodeled failure penalties.
-- **[Phase 4: Multi-Seed Statistical Significance](docs/phase4-multiseed-results.md)** — 5-seed evaluation ($N=50,000$), standard errors, 95% confidence intervals, and paired Student's t-tests.
-
-### Primary Portfolio & Architecture Reports
-
-- **[Portfolio Applied ML & Systems Architecture Report](docs/PORTFOLIO_APPLIED_ML_SYSTEMS_REPORT.md)** — Comprehensive technical evaluation report detailing leakage elimination, 5-fold GroupKFold benchmarking, the calibration discrepancy resolution, contextual bandit regret tracking, net economic modeling, and distributed systems hardening.
-- **[Backend System and Model Performance Report](docs/BACKEND_SYSTEM_AND_MODEL_PERFORMANCE_REPORT.md)** — Historical metrics lineage reconciliation, Go microservice latency benchmarks, and resilience verification.
-
-### Architecture and Product
-
-- [Autonomous Payment Recovery Control Tower](Razorpay%20Autonomous%20Payment%20Recovery%20Control%20Tower.md) — product overview, system architecture, workflows, and operating model.
-- [V2 Architecture Roadmap](docs/V2_ARCHITECTURE_ROADMAP.md) — event-driven platform evolution and future architecture phases.
-- [Implemented Features](docs/IMPLEMENTED_FEATURES.md) — verified feature inventory with implementation and provenance references.
-- [Benchmarks](docs/BENCHMARKS.md) — recovery strategy comparisons, performance metrics, and multi-seed stability results.
-
-### Dashboards and Integration
-
-- [Dashboard Guide](docs/DASHBOARD_GUIDE.md) — purpose, APIs, data sources, and runtime requirements for all eight control-tower dashboards.
-- [Frontend/Backend Compatibility Report](docs/FRONTEND_BACKEND_COMPATIBILITY_REPORT.md) — frontend data contracts, endpoint mappings, and integration gaps.
-- [Full-Stack Integration Report](docs/FULL_STACK_INTEGRATION_PHASES_COMPLETE.md) — completed frontend, backend, database, and service integration phases.
-- [Zero Static Content and Full-Stack Integration Report](docs/ZERO_STATIC_CONTENT_AND_FULL_STACK_INTEGRATION_REPORT.md) — telemetry provenance and live-data verification.
-
-### Reliability and Event Processing
-
-- [Event Idempotency](docs/V2_5_EVENT_IDEMPOTENCY.md) — at-least-once Kafka delivery, duplicate prevention, and idempotent processing.
-- [Backend System and Model Performance Report](docs/BACKEND_SYSTEM_AND_MODEL_PERFORMANCE_REPORT.md) — backend services, model behavior, latency, and performance evidence.
-
-### Engineering History
-
-- [V1 Go Execution Day Report](docs/2026-09-02-v1-go-execution-day-report.md) — Go execution service, reliability controls, and the V1 boundary.
-- [September 3 Session Report](docs/2026-09-03-session-report.md) — executor evolution, audit boundary migration, experimentation, and model retraining.
-- [September 4 Session Report](docs/2026-09-04-session-report.md) — Kafka streaming, distributed idempotency, worker services, and frontend integration.
+### 5.2 Real-Time Decision Audit Search & Multi-Tier Fallback
+The engine provides low-latency search across millions of historical decision records:
+* **Primary Query Engine:** Elasticsearch 8 indexes all audit dimensions (`payment_id`, `customer_id`, `failure_code`, `chosen_action`, `expected_value`, `policy_allowed`, `execution_result`, `timestamp`).
+* **Dynamic Query DSL:** [`backend/elasticsearch_client.py`](backend/elasticsearch_client.py) constructs optimized bool queries with multi-match relevance scoring and aggregations (`by_action`, `by_outcome`).
+* **Resilient Dual Fallback:** If the Elasticsearch cluster is unavailable or unprovisioned, the search endpoint seamlessly falls back to PostgreSQL SQL window aggregations, and subsequently to a process-wide in-memory ledger if the database is offline.
 
 ---
 
-## Technical Deep Dives
+## 6. Batch Policy Re-Evaluation Engine (PySpark)
 
-<details>
-<summary><strong>📐 Expected Value Decision Model</strong></summary>
-
-For each candidate recovery action, the model estimates `P(Y=1 | X, a)` — the probability of successful recovery given payment context X and action a.
-
-This is converted to economic value:
-
-```
-EV(a) = P(success | X, a) × Amount − Cost(a)
-a*    = argmax EV(a)
-```
-
-**Example — pay_123, ₹5,000, BANK_TIMEOUT:**
-
-| Action | P(success) | Cost | EV |
-|---|---:|---:|---:|
-| RETRY_NOW | 0.42 | ₹2 | ₹2,098 |
-| **RETRY_LATER** | **0.71** | **₹2** | **₹3,548** ✓ |
-| SEND_REMINDER | 0.38 | ₹1 | ₹1,899 |
-| NO_ACTION | 0.03 | ₹0 | ₹0 |
-
-The policy gate then authorizes or blocks the selected action before any execution occurs.
-
-</details>
-
-<details>
-<summary><strong>🎲 Thompson Sampling (Beta-Bernoulli)</strong></summary>
-
-Thompson Sampling addresses exploration vs. exploitation across recovery action strategies. Each action maintains a Beta conjugate posterior:
-
-```
-θ_a ~ Beta(α_a, β_a)      (prior: α = β = 1)
-
-Successful recovery → α ← α + 1
-Failed recovery     → β ← β + 1
-```
-
-Posteriors are persisted in PostgreSQL `bandit_posterior` so state survives restarts.
-
-**Safety invariant:** Thompson Sampling informs selection but **always passes through the Policy Gate** before execution.
-
-</details>
-
-<details>
-<summary><strong>🔍 SHAP Explainability</strong></summary>
-
-For any prediction, the system decomposes the model output into per-feature contributions:
-
-```
-f(x) = φ₀ + Σᵢ φᵢ
-```
-
-**Example — RETRY_LATER selected (P = 0.73):**
-
-```
-Base value:          0.44
-
-Positive factors:
-  success_rate    +0.09
-  amount          +0.07
-  hour            +0.03
-
-Negative factors:
-  failure_code    −0.05
-  recovery_rate   −0.02
-
-Final output:        0.73
-```
-
-SHAP values are per-prediction explanations — distinct from Random Forest MDI feature importance, which is a global model property.
-
-</details>
-
-<details>
-<summary><strong>🔐 RFC 6962 Merkle Audit Proofs</strong></summary>
-
-Audit records are organized into a Merkle tree following the RFC 6962 Certificate Transparency specification:
-
-```
-Leaf hash:  SHA256(0x00 ‖ leaf_data)
-Node hash:  SHA256(0x01 ‖ H_left ‖ H_right)
-```
-
-For any audit record the system generates an inclusion proof: `Leaf → siblings → Root`.
-
-The proof can be independently verified without trusting the issuer. This provides cryptographic integrity detection — not immutable storage, which requires separate infrastructure.
-
-</details>
-
-<details>
-<summary><strong>⚡ Distributed Rate Limiting (Redis)</strong></summary>
-
-Without distributed rate limiting each worker tracks its own counter — the global limit can be exceeded.
-
-With Redis atomic Lua scripting all workers share one quota with zero race conditions:
-
-```
-Worker A ─┐
-Worker B ─┤── Redis Atomic Token Bucket ──► shared quota
-Worker C ─┘
-```
-
-**Failure policy: FAIL-CLOSED.** If Redis is unreachable, requests are rejected rather than silently bypassing the limit.
-
-</details>
-
----
-
-## Data Provenance
-
-All dashboards and metrics explicitly label their source:
-
-| Label | Meaning |
-|---|---|
-| `LIVE` | Fetched from a running service at request time |
-| `SIMULATED BENCHMARK` | Controlled experiment on synthetic data |
-| `EVALUATION DATASET` | Offline model evaluation on `ml/data.csv` |
-| `UNAVAILABLE` | Dependency unreachable — never fabricated |
-
----
-
-## Tech Stack
-
-```
-┌──────────────────────────────────────────────────────────┐
-│                     Control Tower                        │
-│          React 18  •  TypeScript  •  Vite  •  Tailwind   │
-└─────────────────────────┬────────────────────────────────┘
-                          │ REST API
-┌─────────────────────────▼────────────────────────────────┐
-│                  Python AI Engine                        │
-│        FastAPI  •  scikit-learn  •  SHAP  •  Redis       │
-└──────┬───────────────────────────────────┬───────────────┘
-       │ Recovery Command                  │ Audit / State
-┌──────▼──────────┐             ┌──────────▼───────────────┐
-│  Go Executor    │             │       PostgreSQL          │
-│  Retry + CB     │             │  Audit • Idempotency      │
-│  Kafka DLQ      │             │  Bandit Posteriors        │
-└──────┬──────────┘             └──────────────────────────┘
-       │
-┌──────▼──────────┐   ┌────────────────────────────────────┐
-│  Apache Kafka   │   │             Redis                  │
-│  Event Bus      │   │  Distributed Rate Limiter          │
-└─────────────────┘   └────────────────────────────────────┘
-```
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- Python 3.10 or newer
-- Docker Desktop or Docker Engine with Docker Compose
-- Go 1.22 or newer
-- Node.js 18 or newer and npm
-
-The Compose services use Linux images (`postgres:16`, `redis:7-alpine`, and
-`apache/kafka:4.0.0`). On Windows or macOS, Docker Desktop must be using
-**Linux containers**. The setup script can start Docker Desktop when it is
-installed, but Docker itself must be installed first.
-
-### Automated Setup
-
-Run these commands from any directory after cloning. The script resolves paths
-relative to itself, so the repository does not need to be installed in a
-specific location:
-
-```powershell
-python path\to\razorpay-recovery-engine\setup_and_run.py
-```
-
-The runner checks Python and Docker, installs missing Python packages from
-`requirements.txt`, validates the Compose file, checks the configured images,
-pulls missing images, starts PostgreSQL, Redis, and Kafka, generates the
-dataset, trains the model, runs tests, and executes the inference smoke test.
-
-Useful modes:
-
-```powershell
-# Start only Docker infrastructure
-python setup_and_run.py --docker
-
-# Stop Docker infrastructure
-python setup_and_run.py --stop-docker
-
-# Generate data and train the model
-python setup_and_run.py --train
-
-# Run dependency checks and tests
-python setup_and_run.py --test
-
-# Start Docker, FastAPI, Go, React, the live injector, and proof stream
-python setup_and_run.py --launch
-```
-
-`--launch` keeps the terminal attached and stops all application processes
-together when you press `Ctrl+C`. FastAPI runs on `http://localhost:8000`, the
-Go executor on `http://localhost:8080`, and Vite normally uses
-`http://localhost:5173`.
-
-If Docker is not installed, the normal setup continues with local Python
-steps. If Docker is installed but its engine is stopped, the runner attempts
-to start it; use `--docker` to require infrastructure startup and report any
-failure. Python itself must be installed before running the script.
-
-## Run Locally
-
-### Prerequisites
-- **Python**: 3.12+
-- **Go**: 1.22+
-- **Node.js**: 20+ (with npm)
-- **Java**: 17+ (required for local PySpark batch replay)
-- **Docker & Docker Compose**: Required for PostgreSQL, Redis, Kafka, and optional Elasticsearch
-
-### Step-by-Step Setup
-
-#### 1. Environment Configuration
-Copy the template configuration file:
-```bash
-cp .env.example .env
-```
-*(Customize `.env` with your secure credentials; never commit secrets to version control).*
-
-#### 2. Start Supporting Infrastructure
-Start PostgreSQL, Redis, Kafka, and Kafka topic initializers via Docker Compose:
-```bash
-# Core messaging and database services
-docker compose up -d postgres redis kafka kafka-init
-
-# Optional: include Elasticsearch cluster for indexed audit search
-docker compose --profile search up -d
-```
-
-#### 3. Python Environment & Dependencies
-Set up the Python virtual environment and install dependencies:
-```bash
-python -m venv .venv
-# On Windows (PowerShell):
-.venv\Scripts\Activate.ps1
-# On Linux/macOS:
-# source .venv/bin/activate
-
-pip install -r requirements.txt
-```
-
-#### 4. Run Application Services
-
-In separate terminal windows:
+Located in [`batch/policy_replay/`](batch/policy_replay/), this offline processing module enables quantitative backtesting of alternative recovery policies against historical payment decision datasets.
 
 ```bash
-# Terminal 1: Go Execution Engine (:8080)
-cd backend/go-executor
-go run .
-
-# Terminal 2: Python FastAPI Decision & Audit Engine (:8000)
-uvicorn backend.api.app:app --host 0.0.0.0 --port 8000 --reload
-
-# Terminal 3: React Control Tower UI (:5173)
-cd frontend
-npm install
-npm run dev
-```
-
-#### 5. Verify the Test Suite
-
-```bash
-# 1. Python Unit Test Suite (110 passing, isolated offline)
-python -m pytest -m "not integration"
-
-# 2. Go Unit Tests (circuit breaker, backpressure, token bucket)
-cd backend/go-executor
-make test-unit
-cd ../..
-
-# 3. Frontend Typecheck and Production Bundle
-npm --prefix frontend run build
-
-# 4. Elasticsearch Query & Fallback Tests
-python -m pytest tests/test_audit_search.py
-
-# 5. PySpark Batch Policy Replay Test
-python -m pytest tests/test_policy_replay.py
-```
-
-#### 6. Run PySpark Batch Policy Re-evaluation Job Locally
-```bash
-# Replay 4 recovery policies against historical decision CSV
+# Run local PySpark batch re-evaluation on historical CSV export
 python batch/policy_replay/replay_job.py --input tests/fixtures/sample_decisions.csv --margin 1.0
 ```
 
----
-
-## Testing & ML Auditing
-
-```bash
-# 1. Python unit tests (110 passing, zero network dependencies, 100% offline)
-python -m pytest -m "not integration"
-
-# 2. Full API Endpoints suite (16 passing, RFC 6962, SHAP, MAB, DLQ, rate limiting)
-python -m pytest backend/api/test_full_endpoints.py -v
-
-# 3. Reproducible ML Benchmark Audit (5-Fold GroupKFold cross-validation)
-python run_ml_audit.py
-
-# 4. Go test suite — unit + integration + backpressure + circuit breaker (112 passing)
-cd backend/go-executor && go test -count=1 ./... && cd ../..
-
-# 5. Controlled experiment net economics verification
-python -m pytest tests/test_controlled_experiment.py -v
-
-# 6. Read the complete audit and verification reports:
-# See docs/phase1-final-report.md, docs/phase2-integration-report.md, docs/phase2-simulator-audit.md
-```
+### Capabilities
+* Replays 4 policies simultaneously (`Always Retry`, `Naive Rule`, `Expert Rule`, `Current AI Engine`).
+* Calculates counterfactual gross recoveries, direct operational costs, expected net economic value ($EV$), and policy suppression rates.
+* **Verified Agreement:** Validated by unit tests ([`tests/test_policy_replay.py`](tests/test_policy_replay.py)) proving that PySpark partition execution (`mapPartitions`) and pure Python sequential execution yield identical mathematical results.
 
 ---
 
-## Repository Structure
+## 7. Empirical Verification & Benchmark Matrix
+
+> [!IMPORTANT]
+> **Data Transparency Notice:** All machine learning models, statistical significance tests, and 4-way strategy comparisons reported below were generated on **synthetic payment datasets** via parametric simulation (`ml/data.csv`, 61,520 records across 3,076 unique payment entities). No real merchant or cardholder PII is contained in this repository.
+
+### 7.1 Cross-Validation Performance (5-Fold GroupKFold)
+Evaluated via `python run_ml_audit.py`. Groups are partitioned strictly by `payment_id` ($\text{Train} \cap \text{Test} = \emptyset$) to prevent counterfactual leakage:
+
+| Model Architecture | ROC-AUC | PR-AUC | Brier Score Loss | Log Loss | ECE | Production Status |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Dummy (Prior Baseline)** | $0.5000 \pm 0.0000$ | $0.3310 \pm 0.0048$ | $0.2214 \pm 0.0016$ | $0.6349 \pm 0.0033$ | $0.0045 \pm 0.0039$ | Baseline Reference |
+| **Logistic Regression (L2)** | $0.7697 \pm 0.0029$ | $0.5654 \pm 0.0067$ | $0.1749 \pm 0.0007$ | $0.4937 \pm 0.0015$ | $0.0080 \pm 0.0023$ | Linear Baseline |
+| **Random Forest (Raw)** | **$0.7897 \pm 0.0029$** | **$0.6036 \pm 0.0071$** | **$0.1699 \pm 0.0011$** | **$0.4836 \pm 0.0025$** | **$0.0124 \pm 0.0021$** | **Production Preferred** |
+| **Random Forest (Sigmoid Calibrated)** | $0.7913 \pm 0.0033$ | $0.6062 \pm 0.0074$ | $0.1826 \pm 0.0012$ | $0.5416 \pm 0.0036$ | $0.0975 \pm 0.0029$ | Degraded Calibration |
+
+*Model Selection Finding:* Platt/Sigmoid calibration degraded the Brier score by $+7.5\%$ and inflated Expected Calibration Error ($\sim 8\times$). Uncalibrated Random Forest ensembles yielded superior probability sharpness and are deployed to production.
+
+### 7.2 Multi-Seed Statistical Significance Evaluation
+Evaluated via `python backend/run_stability.py` across 5 independent random seeds ($N = 50,000$ total transactions, 15,176 failures) using Common Random Numbers (CRN) variance reduction:
+
+| Strategy | Recovered Revenue (Mean ± SD) | Standard Error (SE) | 95% Confidence Interval | Recovery Rate | Selectivity (NO_ACTION Rate) |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Always Retry** | ₹6,256,765 ± 131,885 | ₹58,981 | [₹6.09M, ₹6.42M] | 40.62% | 0.00% (0) |
+| **Naive Rule** | ₹8,076,706 ± 148,094 | ₹66,230 | [₹7.89M, ₹8.26M] | 52.30% | 0.00% (0) |
+| **Expert Rule** | **₹9,478,917 ± 235,649** | ₹105,385 | [₹9.19M, ₹9.77M] | **61.21%** | 0.00% (0) |
+| **AI Decision Engine** | ₹8,696,893 ± 234,272 | ₹104,770 | [₹8.41M, ₹8.99M] | 55.92% | **9.01% (273.4)** |
+
+#### Hypothesis Testing (Paired Student's t-Test, $df = 4$):
+1. **AI Engine vs. Always Retry:** **+39.05% ± 4.79% Mean Lift** ($t = 19.99, p = 3.69 \times 10^{-5}$, **$p < 0.001$**). Statistically significant superiority.
+2. **AI Engine vs. Naive Rule:** **+7.67% ± 1.09% Mean Lift** ($t = 14.16, p = 1.44 \times 10^{-4}$, **$p < 0.001$**). Statistically significant superiority (5/5 seeds positive).
+3. **AI Engine vs. Expert Rule:** **-8.25% ± 0.90% Gross Difference** ($t = -20.22, p < 0.001$).
+   *Scientific Explanation:* In the local simulator, direct action fees are minimal (₹2.00) while failed retry penalties are ₹0.00. The non-selective Expert Rule blindly retries 100% of failures, capturing low-probability successes ($P \in [0.20, 0.49]$) that the AI Engine deliberately suppresses via its 50% confidence floor. In live banking environments where card schemes impose steep decline penalty fees ($\ge \text{₹}15.00$), selective suppression is necessary to prevent negative net unit economics.
+
+---
+
+## 8. Repository Architecture & Layout
 
 ```
 razorpay-recovery-engine/
+├── .github/
+│   └── workflows/ci.yml         # CI workflow: gofmt, go vet, unit -race, python tests, frontend
 ├── backend/
 │   ├── api/
-│   │   ├── app.py                      # FastAPI endpoints
-│   │   └── schemas.py                  # Pydantic models
-│   ├── bandit.py                       # Thompson Sampling
-│   ├── bandit_repository.py            # PostgreSQL posteriors
-│   ├── ml_explainer.py                 # SHAP TreeExplainer
-│   ├── crypto_merkle.py                # RFC 6962 Merkle tree
-│   ├── rate_limiter.py                 # Redis Lua token bucket
-│   ├── decision/engine.py              # EV decision engine
-│   ├── policy/engine.py                # Deterministic policy gate
-│   ├── audit_repository.py             # PostgreSQL audit layer
-│   ├── recovery_pipeline.py            # End-to-end pipeline
-│   └── go-executor/
-│       ├── main.go                     # Go service entrypoint
-│       ├── retry.go                    # Bounded retry logic
-│       ├── circuit_breaker.go          # Per-gateway circuit breaker
-│       ├── distributed_rate_limiter.go # Redis Lua token bucket (Go)
-│       └── events/
-│           ├── kafka_dlq_publisher.go  # DLQ producer (acks=all)
-│           └── kafka_dlq_consumer.go   # DLQ consumer
+│   │   ├── app.py               # FastAPI application, OpenAPI endpoints, healthchecks
+│   │   ├── schemas.py           # Pydantic v2 schemas and validation models
+│   │   ├── test_app.py          # Fast offline API unit tests
+│   │   └── test_full_endpoints.py # Integration test suite for all endpoints
+│   ├── audit_repository.py      # PostgreSQL ACID audit repository with resilient fallbacks
+│   ├── bandit.py                # Contextual Thompson Sampling Beta-Bernoulli MAB engine
+│   ├── crypto_merkle.py         # RFC 6962 Cryptographic Merkle tree implementation
+│   ├── decision/
+│   │   └── engine.py            # Expected Value optimization algorithm & cost matrix
+│   ├── elasticsearch_client.py  # Elasticsearch indexing, DSL query builder, and search
+│   ├── policy/
+│   │   └── engine.py            # Deterministic policy guardrails and safety constraints
+│   ├── rate_limiter.py          # Redis atomic Lua distributed token bucket
+│   ├── rule_baseline.py         # Naive and Expert domain heuristic rule baselines
+│   ├── controlled_experiment.py # 4-way counterfactual experiment harness (CRN)
+│   ├── run_stability.py         # Multi-seed statistical stability test harness
+│   └── go-executor/             # High-throughput Go execution microservice
+│       ├── main.go              # Service entry point and HTTP multiplexer
+│       ├── circuit_breaker.go   # Per-gateway three-state circuit breaker
+│       ├── rate_limiter.go      # Token bucket limiter implementation
+│       ├── postgres_store.go    # PostgreSQL command idempotency store
+│       ├── Makefile             # Test, format, and build targets
+│       └── events/              # Kafka consumers, DLQ handlers, and event workers
+├── batch/
+│   └── policy_replay/           # PySpark batch counterfactual policy re-evaluation engine
+│       ├── replay_job.py        # PySpark replay script
+│       └── README.md            # Execution documentation
+├── frontend/                    # React 18 / TypeScript Control Tower UI
+│   ├── src/
+│   │   ├── pages/               # Dashboard pages (Audit Search, Live Recovery, Policies)
+│   │   ├── store/               # Redux Toolkit store and RTK Query API slice
+│   │   └── components/          # Layout, tables, metrics, and visual components
+├── docs/                        # Formal architecture reports, ADRs, and benchmark logs
 ├── ml/
-│   ├── train.py                        # Model training script
-│   ├── model.pkl                       # Trained RF pipeline
-│   └── data.csv                        # 59K synthetic training rows
-├── frontend/
-│   └── src/
-│       ├── pages/                      # 8 dashboard pages
-│       ├── components/                 # Charts · UI · system cards
-│       └── api/index.ts                # Typed API clients
-├── tests/                              # Python pytest suite
-├── docs/
-├── docker-compose.yml
+│   ├── data.csv                 # Synthetic training dataset (61,520 rows)
+│   └── model_store.py           # Model loading and persistence helpers
+├── tests/                       # Pytest test suite (unit, property, replay, search)
+├── docker-compose.yml           # Local infrastructure stack (Postgres, Redis, Kafka, ES)
+├── requirements.txt             # Minimal Python production dependencies
 └── README.md
 ```
 
 ---
 
-## Design Principles
+## 9. Run Locally & Quickstart
 
-**AI does not equal authority** — The model recommends. The policy gate authorizes.
+### Prerequisites
+* **Python**: 3.12+
+* **Go**: 1.22+
+* **Node.js**: 20+ (with npm)
+* **Java**: 17+ (required for local PySpark batch execution)
+* **Docker & Docker Compose**: For infrastructure services
 
-**Probability does not equal value** — A 90% chance of recovering ₹100 is not always better than a 40% chance of recovering ₹1,000. Expected Value decides.
+### Quickstart Execution
 
-**Failure is expected** — Duplicate events, network timeouts, and gateway errors are normal distributed-system conditions. The system is designed around them.
+```bash
+# 1. Clone the repository
+git clone https://github.com/uday68/payment-recovery-engine.git
+cd payment-recovery-engine
 
-**Every decision must be traceable** — Input → Prediction → EV → Policy → Execution → Outcome → Audit → Proof.
+# 2. Configure environment
+cp .env.example .env
 
-**Never fake telemetry** — When real data is unavailable, say `UNAVAILABLE`. When data is simulated, say `SIMULATED`.
+# 3. Start backing services via Docker Compose
+docker compose up -d postgres redis kafka kafka-init
+
+# (Optional: Start with Elasticsearch profile)
+# docker compose --profile search up -d
+
+# 4. Set up Python virtual environment
+python -m venv .venv
+source .venv/bin/activate  # On Windows PowerShell: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+
+# 5. Start the microservices
+# Terminal 1: Go Execution Engine (:8080)
+cd backend/go-executor && go run .
+
+# Terminal 2: Python FastAPI Decision Engine (:8000)
+uvicorn backend.api.app:app --host 0.0.0.0 --port 8000 --reload
+
+# Terminal 3: React Control Tower UI (:5173)
+cd frontend && npm install && npm run dev
+```
 
 ---
 
-## Limitations
+## 10. Production Standards & Quality Gates
 
-This repository is designed as an applied systems and machine learning portfolio project demonstrating production-grade distributed patterns. The following boundaries apply:
+Every code change must pass automated continuous integration quality gates configured in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
-1. **Synthetic Data Only**: All training datasets (`ml/data.csv`), test vectors, multi-seed stability benchmarks, and counterfactual comparisons are generated via parametric synthetic simulation. No real merchant financial transactions, proprietary banking telemetry, or customer PII are used or claimed.
-2. **Local Workstation Deployment**: The current deployment topology is configured for single-workstation local development via Docker Compose (`localhost:8000`, `localhost:8080`, `localhost:5173`). Production enterprise deployment requires VPC network isolation, mutual TLS (mTLS), hardware security module (HSM) secret management, role-based access control (RBAC), and PCI-DSS compliance verification.
-3. **Unmodeled Bank Decline Penalties**: In the current local simulator, failed retries incur a direct API dispatch fee (₹2.00) but zero bank network decline penalties ($C_{\text{decline}} = \text{₹}0.00$). Consequently, non-selective rule baselines that retry 100% of failures capture marginal gross revenue that the AI engine suppresses via its 50% confidence floor. Under live card scheme penalty fee rules (Visa/Mastercard retry limits), selective gating is economically mandatory.
-4. **PySpark Batch Execution Scale**: The batch policy re-evaluation job in `batch/policy_replay/` is configured and verified for local execution (`local[*]`). It is intended for offline regression backtesting and has not been tuned or benchmarked for distributed multi-node cluster runtimes (e.g., AWS EMR or Databricks).
-5. **Gateway Simulation**: Upstream banking endpoints and recovery success outcomes are simulated deterministically using Common Random Numbers (CRN) for unbiased variance-reduced policy comparison.
+### 10.1 Go Standards
+```bash
+cd backend/go-executor
+
+# Format check
+gofmt -s -l .
+
+# Static analysis
+go vet ./...
+
+# Unit test suite with Race Detector
+go test -race -v -count=1 ./...
+
+# Integration tests (requires Docker services)
+go test -v -count=1 -tags=integration ./...
+```
+
+### 10.2 Python Standards
+```bash
+# Offline unit tests (100% isolated, zero network dependencies)
+python -m pytest -m "not integration"
+
+# Run Elasticsearch query builder and fallback regression tests
+python -m pytest tests/test_audit_search.py
+
+# Run PySpark batch replay equivalence tests
+python -m pytest tests/test_policy_replay.py
+```
+
+### 10.3 Frontend Standards
+```bash
+cd frontend
+
+# TypeScript strict typechecking and production bundling
+npm run build
+```
 
 ---
 
-<div align="center">
+## 11. Scope Boundaries & Known Limitations
 
-**The strongest claim of this project is not that it contains the most components.**
+In the spirit of honest senior backend engineering, the boundaries of this system are explicitly declared:
 
-**It is that the components it claims to have are implemented, testable, traceable, and tied to measurable revenue recovery.**
+1. **Synthetic Training & Simulation Data:** Real banking payment data is heavily guarded under PCI-DSS and privacy regulations. All models in this repository are trained on synthetically generated parametric failure distributions.
+2. **Local Deployment Scope:** Infrastructure manifests (`docker-compose.yml`) are configured for local development and single-node developer evaluation. Enterprise production deployment requires Kubernetes (EKS/GKE), HashiCorp Vault for credentials, multi-region Kafka replication, and hardware security modules (HSMs).
+3. **Gateway Simulation:** Bank switches and card scheme networks are simulated deterministically using Common Random Numbers (CRN). Real-world bank switch protocol integrations (ISO 8583 / AS 2805) are not implemented.
+4. **Unmodeled Decline Fees:** As documented in [Section 7.2](#72-multi-seed-statistical-significance-evaluation), the simulator models direct dispatch costs (₹2.00) but omits network-level decline penalties.
+5. **Batch Processing Scale:** The PySpark policy replay job has been verified for local development execution (`local[*]`). Multi-node cluster orchestration (e.g. AWS EMR or Databricks) requires external cluster configuration.
 
 ---
 
-*Autonomous Multi-Policy Payment Recovery & Audit Control Tower*
+## 12. Governance & Security
 
-</div>
+* **Security Policy:** Review our vulnerability disclosure policy and reporting guidelines in [`SECURITY.md`](SECURITY.md).
+* **Contributing:** Engineering guidelines, pull request protocols, and conventional commit requirements are detailed in [`CONTRIBUTING.md`](CONTRIBUTING.md).
+* **Code Owners:** Service ownership and reviewer hierarchies are declared in [`CODEOWNERS`](CODEOWNERS).
+* **License:** Licensed under the Apache License, Version 2.0. See [`LICENSE`](LICENSE) for terms.
