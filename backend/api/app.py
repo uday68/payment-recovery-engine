@@ -46,12 +46,18 @@ from backend.api.schemas import (
     VerifyProofResponse,
     RateLimiterStatusResponse,
     KafkaDLQStatsResponse,
+    AuditSearchResponse,
+    AuditSearchResultItem,
+    AuditSearchAggregations,
 )
 
 
 try:
     from backend.api.schemas import (
         AIModelHealthResponse,
+        AuditSearchResponse,
+        AuditSearchResultItem,
+        AuditSearchAggregations,
         AuditDetailResponse,
         AuditLedgerEntry,
         AuditLedgerResponse,
@@ -81,6 +87,9 @@ try:
 except ImportError:
     from schemas import (
         AIModelHealthResponse,
+        AuditSearchResponse,
+        AuditSearchResultItem,
+        AuditSearchAggregations,
         AuditDetailResponse,
         AuditLedgerEntry,
         AuditLedgerResponse,
@@ -1309,3 +1318,27 @@ def get_dlq_stats() -> KafkaDLQStatsResponse:
         total_dead_letters=0,
         sample_dead_letters=[],
     )
+
+
+@app.get("/audit/search", response_model=AuditSearchResponse)
+@app.get("/v1/audit/search", response_model=AuditSearchResponse)
+def search_audit_records(
+    q: Optional[str] = Query(None, description="Free-text search query across ids, reasons, and codes"),
+    failure_code: Optional[str] = Query(None, description="Filter by failure code"),
+    action: Optional[str] = Query(None, description="Filter by chosen/executed action"),
+    from_date: Optional[str] = Query(None, alias="from", description="Filter from timestamp (ISO format)"),
+    to_date: Optional[str] = Query(None, alias="to", description="Filter to timestamp (ISO format)"),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+) -> AuditSearchResponse:
+    repo = AuditRepository(database_url=DB_URL)
+    result = repo.search_decisions(
+        q=q,
+        failure_code=failure_code,
+        action=action,
+        from_date=from_date,
+        to_date=to_date,
+        limit=limit,
+        offset=offset,
+    )
+    return AuditSearchResponse(**result)

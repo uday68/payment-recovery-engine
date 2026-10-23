@@ -393,3 +393,35 @@ class KafkaDLQStatsResponse(BaseModel):
     topic: str = "recovery.payment.failed.dlq"
     total_dead_letters: int
     sample_dead_letters: List[Dict[str, Any]] = []
+
+
+class AuditSearchAggregations(BaseModel):
+    by_action: Dict[str, int] = {}
+    by_outcome: Dict[str, int] = {}
+
+
+class AuditSearchResultItem(BaseModel):
+    payment_id: str
+    customer_id: Optional[str] = None
+    amount: float = 0.0
+    failure_code: Optional[str] = None
+    recommended_action: Optional[str] = None
+    executed_action: Optional[str] = None
+    chosen_action: Optional[str] = None
+    expected_value: float = 0.0
+    policy_allowed: bool = False
+    policy_reason: Optional[str] = None
+    policy_outcome: Optional[str] = None
+    outcome: Optional[str] = None
+    recovered: Optional[bool] = None
+    execution_result: Optional[str] = None
+    timestamp: str = ""
+    bank: Optional[str] = None
+    payment_method: Optional[str] = None
+
+
+class AuditSearchResponse(BaseModel):
+    total: int
+    results: List[AuditSearchResultItem]
+    aggregations: AuditSearchAggregations
+    source: str  # "elasticsearch", "postgres", or "in_memory"

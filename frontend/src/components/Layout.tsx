@@ -9,7 +9,8 @@ export type PageId =
   | "ai-decisions"
   | "policies"
   | "system-health"
-  | "audit-log";
+  | "audit-log"
+  | "audit-search";
 
 interface LayoutProps {
   currentPage: PageId;
@@ -256,6 +257,18 @@ export const Layout: React.FC<LayoutProps> = ({
                   </div>
                   <span className="px-space-xs py-space-2xs rounded-lg bg-secondary/10 text-secondary font-mono-code text-[10px]">
                     WAL
+                  </span>
+                </div>
+                <div
+                  className={getNavClass("audit-search")}
+                  onClick={() => setCurrentPage("audit-search")}
+                >
+                  <div className="flex items-center gap-space-sm">
+                    <span className="material-symbols-outlined text-[16px]">search</span>
+                    <span>Audit Search</span>
+                  </div>
+                  <span className="px-space-xs py-space-2xs rounded-lg bg-primary/10 text-primary font-mono-code text-[10px]">
+                    ES/SQL
                   </span>
                 </div>
               </nav>
