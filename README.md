@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ Razorpay AI Revenue Recovery Engine
+# ⚡ Autonomous Payment Revenue Recovery Engine
 
 ### *Turn payment failures into recovered revenue — intelligently, reliably, and verifiably.*
 
@@ -15,7 +15,7 @@
 
 <br/>
 
-> **Razorpay AI Buildathon — Track 03: AI Revenue Recovery**
+> **Autonomous Multi-Policy Payment Recovery & Audit Control Tower**
 
 </div>
 
@@ -164,61 +164,29 @@ Counterfactual outcomes generated using Common Random Numbers (CRN) variance red
 
 ### Decision Pipeline
 
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                         PAYMENT FAILURE                          │
-└─────────────────────────────┬────────────────────────────────────┘
-                              │
-                              ▼
-          ┌───────────────────────────────────┐
-          │           Apache Kafka            │
-          │     topic: recovery.payment.failed│
-          └─────────────────┬─────────────────┘
-                            │ at-least-once delivery
-                            ▼
-          ┌───────────────────────────────────┐
-          │         Recovery Worker           │
-          │  ✓ Event idempotency check        │
-          │  ✓ Distributed rate limit (Redis) │
-          └─────────────────┬─────────────────┘
-                            │
-                            ▼
-          ┌───────────────────────────────────┐
-          │      Python AI Decision Engine    │
-          │                                   │
-          │  Random Forest                    │
-          │    → P(success | context, action) │
-          │                                   │
-          │  Expected Value                   │
-          │    → EV(a) = P × Amount − Cost(a) │
-          │    → argmax EV(a)                 │
-          │                                   │
-          │  Thompson Sampling                │
-          │    → Beta(α,β) per action         │
-          │    → exploration–exploitation     │
-          │                                   │
-          │  Policy Gate  ← deterministic     │
-          │    → P < 0.50 → NO_ACTION         │
-          └─────────────────┬─────────────────┘
-                            │  Recovery Command
-                            ▼
-          ┌───────────────────────────────────┐
-          │         Go Recovery Executor      │
-          │  ✓ Command idempotency            │
-          │  ✓ Bounded retries                │
-          │  ✓ Circuit breaker (per gateway)  │
-          │  ✓ Gateway execution              │
-          └──────┬────────────────────────────┘
-                 │
-        ┌────────┴────────┐
-        ▼                 ▼
-    SUCCESS           FAILURE
-        │                 │
-        ▼                 ▼
-  PostgreSQL         Kafka DLQ
-  Audit + Merkle     recovery.payment
-  Bandit reward      .failed.dlq
-  update
+```mermaid
+flowchart TD
+    FailedTx["Failed Payment Event<br/>(payment_id, amount, failure_code)"] --> Kafka["Apache Kafka Ingestion<br/>topic: recovery.payment.failed"]
+    Kafka --> Worker["Recovery Worker<br/>- Event Idempotency Check<br/>- Redis Distributed Rate Limiter"]
+    Worker --> ML["RandomForestClassifier Model<br/>P(recovery | context, action)"]
+    ML --> EV["Expected Value Optimization<br/>arg max EV(a) = P(a) * (Margin * Amount) - Cost(a)"]
+    EV --> Thompson["Contextual Thompson Sampling<br/>(Beta-Bernoulli Exploration)"]
+    Thompson --> Policy{"Deterministic Policy Gate<br/>P >= 0.50 & EV >= Floor"}
+    
+    Policy -- "Blocked / Low Confidence" --> NoAction["NO_ACTION<br/>(Preserve Budget, Trip Avoidance)"]
+    Policy -- "Approved" --> GoCmd["Recovery Command Dispatch"]
+    
+    GoCmd --> GoExec["Go Execution Engine<br/>- Per-Gateway Circuit Breaker<br/>- Distributed Redis Token Bucket<br/>- Exponential Backoff & Jitter"]
+    
+    GoExec --> Gateway["Payment Gateway (Simulated / Live)"]
+    Gateway --> Outcome{"Gateway Outcome"}
+    
+    Outcome -- "Success / Handled Failure" --> Postgres[("PostgreSQL ACID WAL<br/>recovery_audit")]
+    Outcome -- "Dead Letter Exception" --> KafkaDLQ["Kafka DLQ Topic<br/>recovery.payment.failed.dlq"]
+    
+    Postgres --> Merkle["RFC 6962 Cryptographic Merkle Tree<br/>SHA-256 Inclusion Proofs"]
+    Postgres --> ES["Elasticsearch Cluster<br/>Decision Audit Search"]
+    Postgres --> Spark["PySpark Batch Re-evaluation<br/>Counterfactual Policy Replay"]
 ```
 
 ---
@@ -564,35 +532,89 @@ steps. If Docker is installed but its engine is stopped, the runner attempts
 to start it; use `--docker` to require infrastructure startup and report any
 failure. Python itself must be installed before running the script.
 
-### Manual Setup
+## Run Locally
 
-#### 1 — Infrastructure
+### Prerequisites
+- **Python**: 3.12+
+- **Go**: 1.22+
+- **Node.js**: 20+ (with npm)
+- **Java**: 17+ (required for local PySpark batch replay)
+- **Docker & Docker Compose**: Required for PostgreSQL, Redis, Kafka, and optional Elasticsearch
 
+### Step-by-Step Setup
+
+#### 1. Environment Configuration
+Copy the template configuration file:
 ```bash
-docker compose up -d
-# starts PostgreSQL · Kafka · Redis
+cp .env.example .env
+```
+*(Customize `.env` with your secure credentials; never commit secrets to version control).*
+
+#### 2. Start Supporting Infrastructure
+Start PostgreSQL, Redis, Kafka, and Kafka topic initializers via Docker Compose:
+```bash
+# Core messaging and database services
+docker compose up -d postgres redis kafka kafka-init
+
+# Optional: include Elasticsearch cluster for indexed audit search
+docker compose --profile search up -d
 ```
 
-#### 2 — Python Environment
-
-```powershell
+#### 3. Python Environment & Dependencies
+Set up the Python virtual environment and install dependencies:
+```bash
 python -m venv .venv
+# On Windows (PowerShell):
 .venv\Scripts\Activate.ps1
+# On Linux/macOS:
+# source .venv/bin/activate
+
 pip install -r requirements.txt
 ```
 
-#### 3 — Services
+#### 4. Run Application Services
+
+In separate terminal windows:
 
 ```bash
-# Python AI Decision API
-uvicorn backend.api.app:app --host 0.0.0.0 --port 8000
-
-# Go Executor + Recovery Worker
+# Terminal 1: Go Execution Engine (:8080)
 cd backend/go-executor
 go run .
 
-# React Control Tower
-cd frontend && npm install && npm run dev
+# Terminal 2: Python FastAPI Decision & Audit Engine (:8000)
+uvicorn backend.api.app:app --host 0.0.0.0 --port 8000 --reload
+
+# Terminal 3: React Control Tower UI (:5173)
+cd frontend
+npm install
+npm run dev
+```
+
+#### 5. Verify the Test Suite
+
+```bash
+# 1. Python Unit Test Suite (110 passing, isolated offline)
+python -m pytest -m "not integration"
+
+# 2. Go Unit Tests (circuit breaker, backpressure, token bucket)
+cd backend/go-executor
+make test-unit
+cd ../..
+
+# 3. Frontend Typecheck and Production Bundle
+npm --prefix frontend run build
+
+# 4. Elasticsearch Query & Fallback Tests
+python -m pytest tests/test_audit_search.py
+
+# 5. PySpark Batch Policy Replay Test
+python -m pytest tests/test_policy_replay.py
+```
+
+#### 6. Run PySpark Batch Policy Re-evaluation Job Locally
+```bash
+# Replay 4 recovery policies against historical decision CSV
+python batch/policy_replay/replay_job.py --input tests/fixtures/sample_decisions.csv --margin 1.0
 ```
 
 ---
@@ -679,14 +701,13 @@ razorpay-recovery-engine/
 
 ## Limitations
 
-This is a hackathon system. Important scope boundaries:
+This repository is designed as an applied systems and machine learning portfolio project demonstrating production-grade distributed patterns. The following boundaries apply:
 
-- Payment gateway behavior is **locally simulated** — not real bank integrations
-- Controlled experiment results use **synthetic data** — not production traffic
-- Benchmark numbers are **environment-specific**
-- Production deployment requires authentication, authorization, TLS, secret management, compliance controls, and observability infrastructure
-
-These limitations are documented intentionally, not hidden.
+1. **Synthetic Data Only**: All training datasets (`ml/data.csv`), test vectors, multi-seed stability benchmarks, and counterfactual comparisons are generated via parametric synthetic simulation. No real merchant financial transactions, proprietary banking telemetry, or customer PII are used or claimed.
+2. **Local Workstation Deployment**: The current deployment topology is configured for single-workstation local development via Docker Compose (`localhost:8000`, `localhost:8080`, `localhost:5173`). Production enterprise deployment requires VPC network isolation, mutual TLS (mTLS), hardware security module (HSM) secret management, role-based access control (RBAC), and PCI-DSS compliance verification.
+3. **Unmodeled Bank Decline Penalties**: In the current local simulator, failed retries incur a direct API dispatch fee (₹2.00) but zero bank network decline penalties ($C_{\text{decline}} = \text{₹}0.00$). Consequently, non-selective rule baselines that retry 100% of failures capture marginal gross revenue that the AI engine suppresses via its 50% confidence floor. Under live card scheme penalty fee rules (Visa/Mastercard retry limits), selective gating is economically mandatory.
+4. **PySpark Batch Execution Scale**: The batch policy re-evaluation job in `batch/policy_replay/` is configured and verified for local execution (`local[*]`). It is intended for offline regression backtesting and has not been tuned or benchmarked for distributed multi-node cluster runtimes (e.g., AWS EMR or Databricks).
+5. **Gateway Simulation**: Upstream banking endpoints and recovery success outcomes are simulated deterministically using Common Random Numbers (CRN) for unbiased variance-reduced policy comparison.
 
 ---
 
@@ -698,6 +719,6 @@ These limitations are documented intentionally, not hidden.
 
 ---
 
-*Built for Razorpay AI Buildathon · Track 03: AI Revenue Recovery*
+*Autonomous Multi-Policy Payment Recovery & Audit Control Tower*
 
 </div>
