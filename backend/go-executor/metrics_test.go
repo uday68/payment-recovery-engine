@@ -142,13 +142,13 @@ func TestRecoveryMetricsCalculatesRecoveryRate(t *testing.T) {
 
 // 	snapshot := metrics.Snapshot()
 
-// 	if snapshot.RecoveredRevenue != 2500 {
-// 		t.Fatalf(
-// 			"expected recovered revenue 2500, got %f",
-// 			snapshot.RecoveredRevenue,
-// 		)
-// 	}
-// }
+//		if snapshot.RecoveredRevenue != 2500 {
+//			t.Fatalf(
+//				"expected recovered revenue 2500, got %f",
+//				snapshot.RecoveredRevenue,
+//			)
+//		}
+//	}
 func TestRecoveryMetricsTracksOutcomes(t *testing.T) {
 	metrics := NewRecoveryMetrics()
 

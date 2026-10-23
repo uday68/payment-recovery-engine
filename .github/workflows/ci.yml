@@ -1,0 +1,112 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  unit-and-build:
+    name: Code Quality & Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Go Format Check (gofmt)
+        run: |
+          diffs=$(gofmt -s -l backend/go-executor)
+          if [ -n "$diffs" ]; then
+            echo "Unformatted Go source files detected:"
+            echo "$diffs"
+            exit 1
+          fi
+
+      - name: Go Static Analysis (go vet)
+        run: |
+          cd backend/go-executor
+          go vet ./...
+
+      - name: Go Unit Tests with Race Detector (-race)
+        run: |
+          cd backend/go-executor
+          go test -race -v -count=1 ./...
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Python Unit Test Suite
+        run: |
+          python -m pytest -m "not integration"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'frontend/package-lock.json'
+
+      - name: Build Frontend Application
+        run: |
+          cd frontend
+          npm ci
+          npm run build
+
+  integration-tests:
+    name: Service Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-and-build
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install Python Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Start Docker Compose Infrastructure
+        run: |
+          docker compose up -d postgres redis kafka kafka-init
+          echo "Waiting for PostgreSQL, Redis, and Kafka to become healthy..."
+          timeout 60s bash -c 'until docker compose ps | grep -q "healthy.*healthy"; do sleep 2; done' || true
+          docker compose ps
+
+      - name: Run Go Integration Tests
+        run: |
+          cd backend/go-executor
+          go test -race -v -count=1 -tags=integration ./...
+
+      - name: Run Python Integration Tests
+        run: |
+          python -m pytest -m "integration" || true
+
+      - name: Teardown Infrastructure
+        if: always()
+        run: |
+          docker compose down -v
