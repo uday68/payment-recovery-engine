@@ -16,6 +16,8 @@ backend/go-executor/recovery-executor.exe
 
 # Environments
 .env
+.venv/
+.vscode/
 
 # Node / Frontend
 node_modules/
