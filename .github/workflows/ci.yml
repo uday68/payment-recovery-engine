@@ -94,7 +94,7 @@ jobs:
         run: |
           docker compose up -d postgres redis kafka kafka-init
           echo "Waiting for PostgreSQL, Redis, and Kafka to become healthy..."
-          timeout 60s bash -c 'until docker compose ps | grep -q "healthy.*healthy"; do sleep 2; done' || true
+          timeout 90s bash -c 'until docker compose ps | grep -q "healthy.*healthy"; do sleep 2; done'
           docker compose ps
 
       - name: Run Go Integration Tests
@@ -104,7 +104,7 @@ jobs:
 
       - name: Run Python Integration Tests
         run: |
-          python -m pytest -m "integration" || true
+          python -m pytest -m "integration"
 
       - name: Teardown Infrastructure
         if: always()

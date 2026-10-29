@@ -158,9 +158,12 @@ The machine learning recommendation $a^*$ is evaluated by a hard policy engine b
 
 ## 4. Distributed Systems & Reliability Engineering
 
-### 4.1 Strict Idempotency Guarantees
-Payment networks must never double-debit or double-retry. The platform provides two tiers of idempotency:
-1. **Event Ingestion Idempotency:** The Kafka consumer checks PostgreSQL table `processed_events` before invoking decisioning. Duplicate events are acknowledged without re-execution.
+### 4.1 Strict State Lifecycle & Distributed Lease Idempotency
+Payment networks must never double-debit or double-retry. The platform provides two distinct, audited tiers of idempotency:
+1. **Durable Event State Lifecycle:** Rather than a naive presence check, event processing follows an atomic lease-based state machine:
+   * **`PROCESSING`:** The worker claims the event using `ClaimOrRenew()` with a worker lease ID and expiration timestamp (`NOW() + 30s`). If another worker attempts to claim an active lease, `ErrEventInProgress` is returned and the Kafka offset is **NOT** committed, ensuring redelivery if the original worker crashes.
+   * **`COMPLETED`:** Marked durably upon successful command execution. Duplicate redeliveries immediately return `AlreadyCompleted`, allowing safe Kafka offset commitment without re-executing.
+   * **`FAILED` & Bounded Retries:** If execution fails, the state transitions to `FAILED` and releases the lease. Subsequent workers re-claim and increment `retry_count`. If `retry_count >= max_retries`, the event is permanently diverted to the Dead-Letter Queue (DLQ) and the offset is committed to prevent poison-pill partition stalling.
 2. **Command Execution Idempotency:** Every dispatch command generates a deterministic UUID `command_id = SHA256(payment_id + action + attempt)`. The Go executor claims this key in PostgreSQL using atomic SQL transactions:
    ```sql
    INSERT INTO command_idempotency (command_id) VALUES ($1) ON CONFLICT (command_id) DO NOTHING RETURNING command_id;
